@@ -36,48 +36,55 @@ int main(int argc, char* argv[]){
     if (argc != 1){
         return 1;
     }
-    int myNum;
-    char row[100];
-    FILE *file = fopen("database.bin", "rb");
-    if(file == NULL){
-        first_time();
-    }
-    else{
-        fclose(file);
-        bool found = pwd_verif();
-        if(!found){
-            int i = 0;
-            do {
-                i++;
-                printf("Wrong password, %d tries left\n", 3-i);
-                found = pwd_verif();
-            } while(!found && i!= 3);
+    while(1){
+        char myNum[1];
+        int realNum = atoi(myNum);
+        char row[100];
+        FILE *file = fopen("database.bin", "rb");
+        unsigned char key[crypto_secretbox_KEYBYTES];
+        if(file == NULL){
+            first_time(key);
+        }
+        else{
+            fclose(file);
+            bool found = pwd_verif();
             if(!found){
-                return -1;
+                int i = 0;
+                do {
+                    i++;
+                    printf("Wrong password, %d tries left\n", 3-i);
+                    found = pwd_verif();
+                } while(!found && i!= 3);
+                if(!found){
+                    return -1;
+                }
             }
         }
-    }
-    printf("What do you want to do ?\n"); 
-    printf("1. Add new password\n2. See current password\n3. Change existing password\n4. Delete a password from the list\n");
-    fgets(myNum,sizeof(myNum),stdin);
+        printf("What do you want to do ?\n"); 
+        printf("1. Add new password\n2. See current password\n3. Change existing password\n4. Delete a password from the list\n5. exit\n");
+        fgets(myNum,sizeof(myNum),stdin);
 
-    if (myNum == 1){
-        char* new_pwd;      
-        add_pwd();
+        if (realNum == 1){
+            char* new_pwd;      
+            add_pwd();
 
-        new_pwd;
-    }
-    else if (myNum == 2){
-        //see curent pwd
-    }
-    else if (myNum == 3){
-        //change current pwd
-    }
-    else if (myNum == 4){
-        //delete the pwd for a specific thing
-    }
-    else{
-        return -1;
+            new_pwd;
+        }
+        else if (realNum == 2){
+            //see curent pwd
+        }
+        else if (realNum == 3){
+            //change current pwd
+        }
+        else if (realNum == 4){
+            //delete the pwd for a specific thing
+        }
+        else if (realNum == 5){
+            break;
+        }
+        else{
+            printf("Invalid number\n");
+        }
     }
 }
 
@@ -142,21 +149,21 @@ void add_pwd(){
     fclose(file);
 }
 
-void first_time(){
+void first_time(unsigned char *key_out){
     char pwd[30];
     char conf_pwd[30];
 
     printf("This is the first time you open this program.\n");
     printf("Please set a password. This one will be asked every time you open the program so be sure to remember it!\n");
-    scanf("%s", pwd);
+    fgets(pwd, sizeof(pwd), stdin);
     do {
         //ok will become the level of the pwd
         printf("This password is ok. Please confirm by retyping it. Press 1 to change the original password: ");
-        scanf("%s", conf_pwd);
+        fgets(conf_pwd, sizeof(conf_pwd), stdin);
 
-        if(strcmp(conf_pwd,"1") == 0){
+        if(strcmp(conf_pwd,"1") == 0){ //doesn t work gotta improve
             printf("Change orignial password: ");
-            scanf("%s", pwd);
+            fgets(pwd, sizeof(pwd), stdin);
         }
 
     } while (strcmp(pwd,conf_pwd) != 0);
@@ -170,16 +177,32 @@ void first_time(){
 
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
     randombytes_buf(nonce, sizeof(nonce));
+
+    size_t pwd_len = strlen(pwd);
+    unsigned char key[crypto_secretbox_KEYBYTES];
+
+    if (crypto_pwhash(key, sizeof(key),
+                  pwd, strlen(pwd),
+                  salt,
+                  crypto_pwhash_OPSLIMIT_INTERACTIVE,
+                  crypto_pwhash_MEMLIMIT_INTERACTIVE,
+                  crypto_pwhash_ALG_ARGON2ID13) != 0) {
+    printf("Key derivation failed\n");
+    return;
+    }
+
+    
+    unsigned char ciphertext[crypto_secretbox_MACBYTES + pwd_len];
+    printf("\n");
+    crypto_secretbox_easy(ciphertext, pwd, pwd_len, nonce, key);
+
     
     FILE *file = fopen("database.bin","wb");
     fwrite(salt, 1, SALT_SIZE, file);
+    fwrite(nonce, 1, NONCE_SIZE, file);
+    fwrite(ciphertext, 1, sizeof(ciphertext), file);
+
 
     fclose(file);
-
-    // need to implement nonces
-    // needs to derive a key from pwd and salt
-    // still needs to encrypt a string like "verif_cypher" to try key when connecting
-
-
     return;
 }
