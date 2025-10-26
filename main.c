@@ -37,8 +37,8 @@ int main(int argc, char* argv[]){
         return 1;
     }
     while(1){
-        char myNum[1];
-        int realNum = atoi(myNum);
+        char myNum[10];
+        
         char row[100];
         FILE *file = fopen("database.bin", "rb");
         unsigned char key[crypto_secretbox_KEYBYTES];
@@ -60,31 +60,35 @@ int main(int argc, char* argv[]){
                 }
             }
         }
-        printf("What do you want to do ?\n"); 
-        printf("1. Add new password\n2. See current password\n3. Change existing password\n4. Delete a password from the list\n5. exit\n");
-        fgets(myNum,sizeof(myNum),stdin);
+        int realNum;
+        do {
+            printf("What do you want to do ?\n"); 
+            printf("1. Add new password\n2. See current password\n3. Change existing password\n4. Delete a password from the list\n5. exit\n");
+            fgets(myNum,sizeof(myNum),stdin);
+            int realNum = atoi(myNum);
+            
+            if (realNum == 1){
+                char* new_pwd;      
+                add_pwd();
 
-        if (realNum == 1){
-            char* new_pwd;      
-            add_pwd();
-
-            new_pwd;
-        }
-        else if (realNum == 2){
-            //see curent pwd
-        }
-        else if (realNum == 3){
-            //change current pwd
-        }
-        else if (realNum == 4){
-            //delete the pwd for a specific thing
-        }
-        else if (realNum == 5){
-            break;
-        }
-        else{
-            printf("Invalid number\n");
-        }
+                new_pwd;
+            }
+            else if (realNum == 2){
+                //search curent pwd
+            }
+            else if (realNum == 3){
+                //change current pwd
+            }
+            else if (realNum == 4){
+                //delete the pwd for a specific thing
+            }
+            else if (realNum == 5){
+                return 1;
+            }
+            else{
+                printf("Invalid number\n");
+            }
+        } while(realNum != 1 || realNum != 2 || realNum != 3 || realNum != 4 || realNum != 5);
     }
 }
 
