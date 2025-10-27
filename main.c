@@ -46,19 +46,18 @@ int main(int argc, char* argv[]){
         } 
         else{
             fclose(file);
-            bool found = pwd_verif();
+            bool found = pwd_verif(key);
             if(!found){
                 int i = 0;
                 do {
                     i++;
-                    printf("Verifiyng");
                     time_t start = time(NULL);
                     while (time(NULL) - start < 3) {
-                        // Wait
+                        //wait
                     }
 
                     printf("Wrong password, %d tries left\n", 3-i);
-                    found = pwd_verif();
+                    found = pwd_verif(key);
                 } while(!found && i!= 3);
                 if(!found){
                     return -1;
@@ -94,11 +93,9 @@ int main(int argc, char* argv[]){
     }
 }
 
-bool pwd_verif(){
+bool pwd_verif(unsigned char *key_out){
     Record records[MAX_RECORD];
-    int count = 0;
     char user_input[NAME_SIZE];
-    bool found = false;
 
     printf("Password: ");
     fgets(user_input, sizeof(user_input), stdin);
@@ -106,6 +103,10 @@ bool pwd_verif(){
     user_input[strcspn(user_input, "\n")] = '\0';
 
     FILE *file = fopen("database.bin","rb");
+    if (file == NULL) {
+        printf("ERROR: Could not open database\n");
+        return false;
+    }
 
     unsigned char salt[SALT_SIZE];
     fread(salt, 1, SALT_SIZE, file);
@@ -113,15 +114,29 @@ bool pwd_verif(){
     unsigned char nonce[NONCE_SIZE];
     fread(nonce, 1, NONCE_SIZE, file);
 
-    unsigned char cyphertext[VERIF_CIPHER_SIZE];
-    fread(cyphertext,1,VERIF_CIPHER_SIZE, file);
-
+    unsigned char ciphertext[VERIF_CIPHER_SIZE];
+    size_t ciphertext_len = fread(ciphertext,1,VERIF_CIPHER_SIZE, file);
     fclose(file);
 
-    //decrypt the cyphertext and compare it to the string encrypted
-    //if right then good password, if not then wrong
+    if (crypto_pwhash(key_out, crypto_secretbox_KEYBYTES,
+                      user_input, strlen(user_input), salt,
+                      crypto_pwhash_OPSLIMIT_INTERACTIVE,
+                      crypto_pwhash_MEMLIMIT_INTERACTIVE,
+                      crypto_pwhash_ALG_ARGON2ID13) != 0) {
+        printf("Key derivation failed\n");
+        return false;
+    }
 
+    unsigned char decrypted[100];
 
+    if (crypto_secretbox_open_easy(decrypted, ciphertext, ciphertext_len, nonce, key_out) != 0) {
+        // Decryption failed - wrong password
+        return false;
+    }
+
+    sodium_memzero(user_input, sizeof(user_input));
+
+    return true;
 }
 
 void add_pwd(){
@@ -157,15 +172,21 @@ void first_time(unsigned char *key_out){
 
     printf("This is the first time you open this program.\n");
     printf("Please set a password. This one will be asked every time you open the program so be sure to remember it!\n");
+    printf("Password: ");
     fgets(user_pwd, sizeof(user_pwd), stdin);
+    user_pwd[strcspn(user_pwd, "\n")] = '\0';
+
     do {
         //ok will become the level of the user_pwd
-        printf("This password is ok. Please confirm by retyping it. Press 1 to change the original password: ");
+        printf("This password is ok. Please confirm by retyping it. Press 1 to change the original password.");
+        printf("Password: ");
         fgets(conf_user_pwd, sizeof(conf_user_pwd), stdin);
+        conf_user_pwd[strcspn(conf_user_pwd, "\n")] = '\0';
 
-        if(strcmp(conf_user_pwd,"1") == 0){ //doesn t work gotta improve
+        if(strcmp(conf_user_pwd,"1\n") == 0){ //doesn t work gotta improve
             printf("Change orignial password: ");
             fgets(user_pwd, sizeof(user_pwd), stdin);
+            user_pwd[strcspn(user_pwd, "\n")] = '\0';
         }
 
     } while (strcmp(user_pwd,conf_user_pwd) != 0);
@@ -180,21 +201,20 @@ void first_time(unsigned char *key_out){
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
     randombytes_buf(nonce, sizeof(nonce));
 
-    size_t user_pwd_len = strlen(user_pwd);
-    unsigned char key[crypto_secretbox_KEYBYTES];
+    size_t verification_len = strlen(user_pwd);
 
-    if (crypto_pwhash(key, sizeof(key),
+    if (crypto_pwhash(key_out, crypto_secretbox_KEYBYTES,
                   user_pwd, strlen(user_pwd), salt,
                   crypto_pwhash_OPSLIMIT_INTERACTIVE,
                   crypto_pwhash_MEMLIMIT_INTERACTIVE,
                   crypto_pwhash_ALG_ARGON2ID13) != 0) {
-    printf("Key derivation failed\n");
-    return;
+        printf("Key derivation failed\n");
+        return;
     }
 
-    //storing the user_pwd... probably should not
-    unsigned char ciphertext[crypto_secretbox_MACBYTES + user_pwd_len];
-    crypto_secretbox_easy(ciphertext, user_pwd, user_pwd_len, nonce, key);
+    const char *verification_msg = "Val1D_Passw0Rd";
+    unsigned char ciphertext[crypto_secretbox_MACBYTES + verification_len];
+    crypto_secretbox_easy(ciphertext, verification_msg, verification_len, nonce, key_out);
     
     FILE *file = fopen("database.bin","wb");
     fwrite(salt, 1, SALT_SIZE, file);
@@ -202,12 +222,6 @@ void first_time(unsigned char *key_out){
     fwrite(ciphertext, 1, sizeof(ciphertext), file);
     fclose(file);
 
-    strcpy(key, key_out);
-
     sodium_memzero(user_pwd, sizeof(user_pwd));
-    sodium_memzero(nonce,NONCE_SIZE);
-    sodium_memzero(key, sizeof(key));
-
-    
-    return key_out;
+    sodium_memzero(key_out, sizeof(key_out));
 }
