@@ -72,10 +72,10 @@ int main(int argc, char* argv[]){
             int realNum = atoi(myNum);
             
             if (realNum == 1){     
-                add_pwd();
+                add_pwd(key);
             }
             else if (realNum == 2){
-                //search curent pwd
+                //search pwd
             }
             else if (realNum == 3){
                 //change current pwd
@@ -139,31 +139,37 @@ bool pwd_verif(unsigned char *key_out){
     return true;
 }
 
-void add_pwd(){
+void add_pwd(unsigned char *key_out){
     char new_name[50];
     printf("For what is this password for ? [name]\n");
     fgets(new_name, sizeof(new_name), stdin);
+    new_name[strcspn(new_name, "\n")] = '\0';
 
     char new_pwd[50];
-
-    //will add the option of generate a new password later
-
     printf("What is the password?\n");
     fgets(new_pwd, sizeof(new_pwd), stdin);
+    new_pwd[strcspn(new_pwd, "\n")] = '\0';
 
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
     randombytes_buf(nonce, sizeof(nonce)); 
+
+    size_t new_pwd_len = strlen(new_pwd);
+    unsigned char ciphertext[crypto_secretbox_MACBYTES + new_pwd_len];
+    crypto_secretbox_easy(ciphertext, new_pwd, new_pwd_len, nonce, key_out);
+
     FILE *file = fopen("database.bin","ab");
     if(file == NULL){
         printf("ERROR: could not open the file.\n");
         return;
     }
 
-    fprintf(file, "%s,%s,", new_name, new_pwd);
-    for (int i = 0; i <crypto_secretbox_NONCEBYTES; i++){
-        fprintf(file, "%02x", nonce[i]);
-    }
+    fwrite(new_name, 1, sizeof(new_name), file);
+    fwrite(nonce, 1, NONCE_SIZE, file);
+    fwrite(ciphertext, 1, sizeof(ciphertext), file); 
     fclose(file);
+
+    sodium_memzero(ciphertext, sizeof(ciphertext));
+    sodium_memzero(nonce, NONCE_SIZE);
 }
 
 void first_time(unsigned char *key_out){
@@ -201,8 +207,6 @@ void first_time(unsigned char *key_out){
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
     randombytes_buf(nonce, sizeof(nonce));
 
-    size_t verification_len = strlen(user_pwd);
-
     if (crypto_pwhash(key_out, crypto_secretbox_KEYBYTES,
                   user_pwd, strlen(user_pwd), salt,
                   crypto_pwhash_OPSLIMIT_INTERACTIVE,
@@ -213,6 +217,7 @@ void first_time(unsigned char *key_out){
     }
 
     const char *verification_msg = "Val1D_Passw0Rd";
+    size_t verification_len = strlen(verification_msg);
     unsigned char ciphertext[crypto_secretbox_MACBYTES + verification_len];
     crypto_secretbox_easy(ciphertext, verification_msg, verification_len, nonce, key_out);
     
