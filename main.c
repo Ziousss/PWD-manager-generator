@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <sodium.h>
 #include <time.h>
+#include <ctype.h>
 
 /* Definitions */
 #define MAX_RECORD 256
@@ -15,11 +16,13 @@
 #define HEADER_SIZE (SALT_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH)
 
 /* Function signatures*/
-bool pwd_verif();
-void add_pwd();
-void first_time();
-void see_pwd();
-void search_pwd();
+bool pwd_verif(unsigned char *key_out);
+void add_pwd(unsigned char *key_out);
+void first_time(unsigned char *key_out);
+void see_pwd(unsigned char *key_out);
+void search_pwd(unsigned char *key_out);
+bool part_of(char *search, char *name);
+
 
 /* Struct */
 typedef struct {
@@ -67,6 +70,12 @@ int main(int argc, char* argv[]){
         printf("1. Add new password\n2. See current password\n3. Search password\n4. Change existing password\n5. Delete a password from the list\n6. exit\n");
         fgets(myNum,sizeof(myNum),stdin);
         int realNum = atoi(myNum);
+
+        FILE *file = fopen("database.bin", "rb");
+        if(file == NULL){
+            printf("no file detected.\n");
+            return -1;
+        }
         
         if (realNum == 1){     
             add_pwd(key);
@@ -154,6 +163,10 @@ void add_pwd(unsigned char *key_out){
     new_name[strcspn(new_name, "\n")] = '\0';
 
     file = fopen("database.bin", "rb");
+    if(file == NULL){
+        printf("Could not open the file.\n");
+        return;
+    }
 
     unsigned char header[SALT_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH];
     fread(header, 1, HEADER_SIZE, file);
@@ -278,6 +291,11 @@ void first_time(unsigned char *key_out){
     crypto_secretbox_easy(ciphertext, verification_msg,PWD_LENGTH, nonce, key_out);
     
     FILE *file = fopen("database.bin","wb");
+    if(file == NULL){
+        printf("Could not open the file.\n");
+        return;
+    }
+
     fwrite(salt, 1, SALT_SIZE, file);
     fwrite(nonce, 1, NONCE_SIZE, file);
     fwrite(ciphertext, 1, sizeof(ciphertext), file);
@@ -292,6 +310,10 @@ void first_time(unsigned char *key_out){
 void see_pwd(unsigned char *key_out){
     Record records[MAX_RECORD];
     FILE *file = fopen("database.bin","rb");
+    if(file == NULL){
+        printf("Could not open the file.\n");
+        return;
+    }
 
     unsigned char header[SALT_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH];
     fread(header, 1, HEADER_SIZE, file);
@@ -346,6 +368,10 @@ void search_pwd(unsigned char *key_out){
     name[strcspn(name, "\n")] = '\0';
 
     FILE *file = fopen("database.bin","rb");
+    if(file == NULL){
+        printf("Could not open the file.\n");
+        return;
+    }
 
     unsigned char header[SALT_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH];
     fread(header, 1, HEADER_SIZE, file);
@@ -359,7 +385,7 @@ void search_pwd(unsigned char *key_out){
         if(fread(records[count].name, 1, NAME_SIZE, file) != NAME_SIZE) {
             break;
         } records[count].name[NAME_SIZE - 1] = '\0';
-        if (strcmp(records[count].name, name) == 0){
+        if (part_of(name, records[count].name)){
             consider[index] = count;
             index++;
             found = true;
@@ -368,7 +394,7 @@ void search_pwd(unsigned char *key_out){
         if(fread(records[count].username, 1, NAME_SIZE, file) != NAME_SIZE) {
             break;
         } records[count].username[NAME_SIZE - 1] = '\0';
-        if (strcmp(records[count].username, name) == 0){
+        if (part_of(name, records[count].username)){
             consider[index] = count;
             index++;
             found = true;
@@ -403,6 +429,34 @@ void search_pwd(unsigned char *key_out){
     printf(" name / username-email / password\n");
     printf("==================================\n");
     for(int i = 0; i < index; i++){
-        printf("%s {%s, %s}\n", records[i].name,records[i].username,records[i].pwd);
+        printf("%s {%s, %s}\n", records[consider[i]].name,records[consider[i]].username,records[consider[i]].pwd);
     }
+}
+
+bool part_of(char *search, char *name){
+    char name_lower[NAME_SIZE];
+    char search_lower[NAME_SIZE];
+    strncpy(name_lower, name, NAME_SIZE);
+    strncpy(search_lower, search, NAME_SIZE);
+    int search_len = strlen(search_lower);
+    int name_len = strlen(name_lower);
+    for(int i =0; i<name_len; i++) {
+        name_lower[i] = tolower(name_lower[i]);
+    }
+    for(int i =0; i<search_len; i++) {
+        search_lower[i] = tolower(search_lower[i]);
+    }
+
+    for (int i = 0; i <= name_len - search_len; i++){
+        int j;
+        for(j = 0; j < search_len; j++){
+            if(name_lower[i+j] != search_lower[j]){
+                break;
+            }
+        }
+        if(j == search_len){
+            return true;
+        }
+    }
+    return false;
 }
