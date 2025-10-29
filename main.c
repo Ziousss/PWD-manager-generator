@@ -22,6 +22,7 @@ void first_time(unsigned char *key_out);
 void see_pwd(unsigned char *key_out);
 void search_pwd(unsigned char *key_out);
 bool part_of(char *search, char *name);
+void change_pwd(unsigned char *key_out);
 
 
 /* Struct */
@@ -87,7 +88,7 @@ int main(int argc, char* argv[]){
             search_pwd(key);
         }
         else if (realNum == 4){
-            //change password
+            change_pwd(key);
         }
         else if (realNum == 5){
             //delete the pwd for a specific thing
@@ -300,9 +301,6 @@ void first_time(unsigned char *key_out){
     fwrite(nonce, 1, NONCE_SIZE, file);
     fwrite(ciphertext, 1, sizeof(ciphertext), file);
     fclose(file);
-    for (int i = 0; i < crypto_secretbox_KEYBYTES; i++){
-        printf("%02x", key_out[i]);
-    }
 
     sodium_memzero(user_pwd, sizeof(user_pwd));
 }
@@ -377,7 +375,7 @@ void search_pwd(unsigned char *key_out){
     fread(header, 1, HEADER_SIZE, file);
 
     int count  = 0;
-    int consider[] = {};
+    int consider[MAX_RECORD];
     int index = 0;
     bool found = false;
     while(count < MAX_RECORD){
@@ -395,9 +393,11 @@ void search_pwd(unsigned char *key_out){
             break;
         } records[count].username[NAME_SIZE - 1] = '\0';
         if (part_of(name, records[count].username)){
-            consider[index] = count;
-            index++;
-            found = true;
+            if (strcmp(records[count].name, records[count].username) != 0){
+                consider[index] = count;
+                index++;
+                found = true;
+            }
         }   
 
         if(fread(records[count].nonce, 1, NONCE_SIZE, file) != NONCE_SIZE) {
@@ -410,7 +410,7 @@ void search_pwd(unsigned char *key_out){
         }
         if(found){
             if (crypto_secretbox_open_easy(records[count].pwd, ciphertext, crypto_secretbox_MACBYTES+PWD_LENGTH, records[count].nonce, key_out) != 0) {
-                printf("%s !!! %s", records[count].pwd,ciphertext);
+                printf("fail");
                 fclose(file);
                 return;
             }
@@ -459,4 +459,110 @@ bool part_of(char *search, char *name){
         }
     }
     return false;
+}
+
+void change_pwd(unsigned char *key_out){
+    char name_search[NAME_SIZE];
+    printf("Which password would you like to change? Type the name of the application which has this password.\n");
+    fgets(name_search, NAME_SIZE, stdin);
+    name_search[strcspn(name_search, "\n")] = '\0';
+
+    int count = 0;
+    Record records[MAX_RECORD];
+    int index = -1;
+    bool found = false;
+
+    FILE *file = fopen("database.bin", "rb");
+    unsigned char header[SALT_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH];
+    fread(header, 1, HEADER_SIZE, file);
+
+    while(count < MAX_RECORD){
+        if(fread(records[count].name, 1, NAME_SIZE, file) != NAME_SIZE) {
+            break;
+        } records[count].name[NAME_SIZE - 1] = '\0';
+        if (strcmp(name_search, records[count].name) == 0){
+            index = count;
+            found = true;
+        }   
+
+        if(fread(records[count].username, 1, NAME_SIZE, file) != NAME_SIZE) {
+            break;
+        } records[count].username[NAME_SIZE - 1] = '\0';
+
+        if(fread(records[count].nonce, 1, NONCE_SIZE, file) != NONCE_SIZE) {
+            break;
+        } 
+
+        unsigned char ciphertext[crypto_secretbox_MACBYTES + PWD_LENGTH];
+        if(fread(ciphertext, 1, crypto_secretbox_MACBYTES+PWD_LENGTH, file) != crypto_secretbox_MACBYTES+PWD_LENGTH) {
+            break;
+        }
+        if(found){
+            if (crypto_secretbox_open_easy(records[count].pwd, ciphertext, crypto_secretbox_MACBYTES+PWD_LENGTH, records[count].nonce, key_out) != 0) {
+                printf("fail");
+                fclose(file);
+                return;
+            }
+        }
+        count++;
+    }
+
+    fclose(file);
+    if(index == -1){
+        printf("No result.\n");
+        return;
+    }
+
+
+    printf(" name / username-email / password\n");
+    printf("==================================\n");
+    for(int i = 0; i < index; i++){
+        printf("%s {%s, %s}\n", records[index].name,records[index].username, records[index].pwd);
+    }
+    char answer[10];
+    do{
+        printf("Is this what you want to change? [Y/N]");
+        fgets(answer, sizeof(answer), stdin);   
+    }while( strcmp(answer, "n\n") != 0 && strcmp(answer, "N\n") != 0 && strcmp(answer, "y\n") != 0 && strcmp(answer, "Y\n") != 0);
+    if(strcmp(answer, "n\n") == 0 ||strcmp(answer, "N\n") == 0){
+        return;
+    }
+
+    char new_username[NAME_SIZE];
+    printf("What is the new username?\n");
+    fgets(new_username, sizeof(new_username), stdin); 
+    new_username[strcspn(new_username, "\n")] = '\0';
+
+    char new_pwd[PWD_LENGTH];
+    char conf_new_pwd[PWD_LENGTH];
+    printf("What is the new password?\n");
+    system("stty -echo");
+    fgets(new_pwd, sizeof(new_pwd), stdin); 
+    new_pwd[strcspn(new_pwd, "\n")] = '\0';
+
+    printf("Confirm your new password\n");
+    fgets(conf_new_pwd, sizeof(conf_new_pwd), stdin); 
+    conf_new_pwd[strcspn(conf_new_pwd, "\n")] = '\0';
+
+    if(strcmp(conf_new_pwd, new_pwd)!=0){
+        do{
+            printf("Both password do not match. Press 1 to change the original password.\n");
+            fgets(conf_new_pwd, sizeof(conf_new_pwd), stdin); 
+            conf_new_pwd[strcspn(conf_new_pwd, "\n")] = '\0';
+            if(strcmp(conf_new_pwd, "1") == 0){
+                printf("What is the new password?\n");
+                fgets(new_pwd, sizeof(new_pwd), stdin);
+                new_pwd[strcspn(new_pwd, "\n")] = '\0';
+            }
+
+        }while(strcmp(conf_new_pwd,new_pwd)!= 0);
+    }
+
+    //update the file itself
+
+
+
+
+    system("stty echo");
+    return;
 }
