@@ -18,12 +18,14 @@
 bool pwd_verif();
 void add_pwd();
 void first_time();
+void see_pwd();
 void search_pwd();
 
 /* Struct */
 typedef struct {
     char name[NAME_SIZE];
     char username[NAME_SIZE];
+    char crypted_pwd[NAME_SIZE];
     char pwd[NAME_SIZE]; 
     unsigned char nonce [crypto_secretbox_NONCEBYTES];
 } Record;
@@ -54,17 +56,15 @@ int main(int argc, char* argv[]){
                     //wait
                 }
 
-                printf("Wrong password, %d tries left\n", 3-i);
+                printf("\nWrong password, %d tries left\n", 3-i);
                 found = pwd_verif(key);
-            } while(!found && i!= 3);
-            if(!found){
-                return -1;
-            }
+            } while(!found && i != 3);
+            return -1;
         }
     }
     while(1){
         printf("\nWhat do you want to do ?\n"); 
-        printf("1. Add new password\n2. See current password/Search password\n3. Change existing password\n4. Delete a password from the list\n5. exit\n");
+        printf("1. Add new password\n2. See current password\n3. Search password\n4. Change existing password\n5. Delete a password from the list\n6. exit\n");
         fgets(myNum,sizeof(myNum),stdin);
         int realNum = atoi(myNum);
         
@@ -72,15 +72,18 @@ int main(int argc, char* argv[]){
             add_pwd(key);
         }
         else if (realNum == 2){
-            search_pwd(key);
+            see_pwd(key);
         }
         else if (realNum == 3){
-            //change current pwd
+            search_pwd(key);
         }
         else if (realNum == 4){
-            //delete the pwd for a specific thing
+            //change password
         }
         else if (realNum == 5){
+            //delete the pwd for a specific thing
+        }
+        else if (realNum == 6){
             sodium_memzero(key, crypto_secretbox_KEYBYTES);
             return 0;
         }
@@ -97,7 +100,7 @@ bool pwd_verif(unsigned char *key_out){
     memset(user_input, 0, NAME_SIZE);
 
     system("stty -echo");
-    printf("Password: ");
+    printf("Password: \n");
     fgets(user_input, sizeof(user_input), stdin);
     user_input[strcspn(user_input, "\n")] = '\0';
 
@@ -130,7 +133,6 @@ bool pwd_verif(unsigned char *key_out){
     unsigned char decrypted[PWD_LENGTH];
 
     if (crypto_secretbox_open_easy(decrypted, ciphertext, ciphertext_len, nonce, key_out) != 0) {
-        printf("false");
         system("stty echo");
         return false;
     }
@@ -287,7 +289,7 @@ void first_time(unsigned char *key_out){
     sodium_memzero(user_pwd, sizeof(user_pwd));
 }
 
-void search_pwd(unsigned char *key_out){
+void see_pwd(unsigned char *key_out){
     Record records[MAX_RECORD];
     FILE *file = fopen("database.bin","rb");
 
@@ -332,5 +334,75 @@ void search_pwd(unsigned char *key_out){
     for(int i = 0; i<count; i++){
         printf("%s {%s, %s}\n", records[i].name,records[i].username,records[i].pwd);
     }
-    printf("You have %d password stored. you have enough space for %d more.", count, MAX_RECORD - count);
+    printf("\nYou have %d password stored. you have enough space for %d more.\n", count, MAX_RECORD - count);
+}
+
+void search_pwd(unsigned char *key_out){
+    Record records[MAX_RECORD];
+
+    char name[NAME_SIZE];
+    printf("For what app are you looking for / What username are you looking for: ");
+    fgets(name,sizeof(name),stdin);
+    name[strcspn(name, "\n")] = '\0';
+
+    FILE *file = fopen("database.bin","rb");
+
+    unsigned char header[SALT_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH];
+    fread(header, 1, HEADER_SIZE, file);
+
+    int count  = 0;
+    int consider[] = {};
+    int index = 0;
+    bool found = false;
+    while(count < MAX_RECORD){
+        found = false;
+        if(fread(records[count].name, 1, NAME_SIZE, file) != NAME_SIZE) {
+            break;
+        } records[count].name[NAME_SIZE - 1] = '\0';
+        if (strcmp(records[count].name, name) == 0){
+            consider[index] = count;
+            index++;
+            found = true;
+        }   
+
+        if(fread(records[count].username, 1, NAME_SIZE, file) != NAME_SIZE) {
+            break;
+        } records[count].username[NAME_SIZE - 1] = '\0';
+        if (strcmp(records[count].username, name) == 0){
+            consider[index] = count;
+            index++;
+            found = true;
+        }   
+
+        if(fread(records[count].nonce, 1, NONCE_SIZE, file) != NONCE_SIZE) {
+            break;
+        } 
+
+        unsigned char ciphertext[crypto_secretbox_MACBYTES + PWD_LENGTH];
+        if(fread(ciphertext, 1, crypto_secretbox_MACBYTES+PWD_LENGTH, file) != crypto_secretbox_MACBYTES+PWD_LENGTH) {
+            break;
+        }
+        if(found){
+            if (crypto_secretbox_open_easy(records[count].pwd, ciphertext, crypto_secretbox_MACBYTES+PWD_LENGTH, records[count].nonce, key_out) != 0) {
+                printf("%s !!! %s", records[count].pwd,ciphertext);
+                fclose(file);
+                return;
+            }
+        }
+        count++;
+    }
+
+    fclose(file);
+
+    if(index == 0){
+        printf("No result.\n");
+        return;
+    }
+
+
+    printf(" name / username-email / password\n");
+    printf("==================================\n");
+    for(int i = 0; i < index; i++){
+        printf("%s {%s, %s}\n", records[i].name,records[i].username,records[i].pwd);
+    }
 }
