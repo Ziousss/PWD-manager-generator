@@ -18,10 +18,12 @@
 bool pwd_verif();
 void add_pwd();
 void first_time();
+void search_pwd();
 
 /* Struct */
 typedef struct {
     char name[NAME_SIZE];
+    char username[NAME_SIZE];
     char pwd[NAME_SIZE]; 
     unsigned char nonce [crypto_secretbox_NONCEBYTES];
 } Record;
@@ -31,60 +33,61 @@ int main(int argc, char* argv[]){
     if (argc != 1){
         return 1;
     }
-    while(1){
-        char myNum[10];
-        unsigned char key[crypto_secretbox_KEYBYTES];
+    unsigned char key[crypto_secretbox_KEYBYTES];
+    
 
-        FILE *file = fopen("database.bin", "rb");
-        if(file == NULL){
-            first_time(key);
-        } 
-        else{
-            fclose(file);
-            bool found = pwd_verif(key);
-            if(!found){
-                int i = 0;
-                do {
-                    i++;
-                    time_t start = time(NULL);
-                    while (time(NULL) - start < 3) {
-                        //wait
-                    }
+    char myNum[10];
 
-                    printf("Wrong password, %d tries left\n", 3-i);
-                    found = pwd_verif(key);
-                } while(!found && i!= 3);
-                if(!found){
-                    return -1;
+    FILE *file = fopen("database.bin", "rb");
+    if(file == NULL){
+        first_time(key);
+    } 
+    else{
+        fclose(file);
+        bool found = pwd_verif(key);
+        if(!found){
+            int i = 0;
+            do {
+                i++;
+                time_t start = time(NULL);
+                while (time(NULL) - start < 3) {
+                    //wait
                 }
+
+                printf("Wrong password, %d tries left\n", 3-i);
+                found = pwd_verif(key);
+            } while(!found && i!= 3);
+            if(!found){
+                return -1;
             }
         }
-        int realNum;
-        do {
-            printf("What do you want to do ?\n"); 
-            printf("1. Add new password\n2. See current password\n3. Change existing password\n4. Delete a password from the list\n5. exit\n");
-            fgets(myNum,sizeof(myNum),stdin);
-            int realNum = atoi(myNum);
-            
-            if (realNum == 1){     
-                add_pwd(key);
-            }
-            else if (realNum == 2){
-                //search pwd
-            }
-            else if (realNum == 3){
-                //change current pwd
-            }
-            else if (realNum == 4){
-                //delete the pwd for a specific thing
-            }
-            else if (realNum == 5){
-                return 0;
-            }
-            else{
-                printf("Invalid number\n");
-            }
-        } while(realNum != 5);
+    }
+    while(1){
+        printf("\nWhat do you want to do ?\n"); 
+        printf("1. Add new password\n2. See current password/Search password\n3. Change existing password\n4. Delete a password from the list\n5. exit\n");
+        fgets(myNum,sizeof(myNum),stdin);
+        int realNum = atoi(myNum);
+        
+        if (realNum == 1){     
+            add_pwd(key);
+        }
+        else if (realNum == 2){
+            search_pwd(key);
+        }
+        else if (realNum == 3){
+            //change current pwd
+        }
+        else if (realNum == 4){
+            //delete the pwd for a specific thing
+        }
+        else if (realNum == 5){
+            sodium_memzero(key, crypto_secretbox_KEYBYTES);
+            return 0;
+        }
+        else{
+            printf("Invalid number\n");
+        }
+
     }
 }
 
@@ -93,6 +96,7 @@ bool pwd_verif(unsigned char *key_out){
     char user_input[NAME_SIZE];
     memset(user_input, 0, NAME_SIZE);
 
+    system("stty -echo");
     printf("Password: ");
     fgets(user_input, sizeof(user_input), stdin);
     user_input[strcspn(user_input, "\n")] = '\0';
@@ -119,6 +123,7 @@ bool pwd_verif(unsigned char *key_out){
                       crypto_pwhash_MEMLIMIT_INTERACTIVE,
                       crypto_pwhash_ALG_ARGON2ID13) != 0) {
         printf("Key derivation failed\n");
+        system("stty echo");
         return false;
     }
 
@@ -126,19 +131,22 @@ bool pwd_verif(unsigned char *key_out){
 
     if (crypto_secretbox_open_easy(decrypted, ciphertext, ciphertext_len, nonce, key_out) != 0) {
         printf("false");
+        system("stty echo");
         return false;
     }
 
     sodium_memzero(user_input, sizeof(user_input));
 
+    system("stty echo");
     return true;
 }
 
 void add_pwd(unsigned char *key_out){
     FILE *file;
+    Record records[MAX_RECORD];
+    
     char new_name[NAME_SIZE];
     memset(new_name, 0, NAME_SIZE);
-    Record records[MAX_RECORD];
     printf("For what is this password for ? [name]\n");
     fgets(new_name, sizeof(new_name), stdin);
     new_name[strcspn(new_name, "\n")] = '\0';
@@ -152,9 +160,12 @@ void add_pwd(unsigned char *key_out){
     while(count < MAX_RECORD){
         if(fread(records[count].name, 1, NAME_SIZE, file) != NAME_SIZE) {
             break;
-        }
-        records[count].name[NAME_SIZE - 1] = '\0';
-        
+        } records[count].name[NAME_SIZE - 1] = '\0';
+
+        if(fread(records[count].username, 1, NAME_SIZE, file) != NAME_SIZE) {
+            break;
+        } records[count].username[NAME_SIZE - 1] = '\0';
+
         if(fread(records[count].nonce, 1, NONCE_SIZE, file) != NONCE_SIZE) {
             break;
         }
@@ -162,10 +173,8 @@ void add_pwd(unsigned char *key_out){
         unsigned char ciphertext[crypto_secretbox_MACBYTES + PWD_LENGTH];
         if(fread(ciphertext, 1, sizeof(ciphertext), file) != sizeof(ciphertext)) {
             break;
-        }
-        count++;
+        } count++;
     }
-
     fclose(file);
 
     for(int i = 0; i < count; i++){
@@ -174,6 +183,12 @@ void add_pwd(unsigned char *key_out){
             return;
         }
     }
+
+    char new_username[NAME_SIZE];
+    memset(new_username, 0, NAME_SIZE);
+    printf("What is your username/e-mail address for this app ?\n");
+    fgets(new_username, sizeof(new_username), stdin);
+    new_username[strcspn(new_username, "\n")] = '\0';
 
     char new_pwd[50];
     memset(new_pwd, 0, PWD_LENGTH);
@@ -184,8 +199,12 @@ void add_pwd(unsigned char *key_out){
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
     randombytes_buf(nonce, sizeof(nonce)); 
 
+    unsigned char pwd_padded[PWD_LENGTH];
+    memset(pwd_padded, 0, PWD_LENGTH);
+    memcpy(pwd_padded, new_pwd, strlen(new_pwd));
+
     unsigned char ciphertext[crypto_secretbox_MACBYTES + PWD_LENGTH];
-    crypto_secretbox_easy(ciphertext, new_pwd, PWD_LENGTH, nonce, key_out);
+    crypto_secretbox_easy(ciphertext, pwd_padded, PWD_LENGTH, nonce, key_out);
 
     file = fopen("database.bin","ab");
     if(file == NULL){
@@ -194,9 +213,13 @@ void add_pwd(unsigned char *key_out){
     }
 
     fwrite(new_name, 1, sizeof(new_name), file);
+    fwrite(new_username, 1, sizeof(new_name), file);
     fwrite(nonce, 1, NONCE_SIZE, file); 
     fwrite(ciphertext, 1, sizeof(ciphertext), file);  
     fclose(file);
+    for (int i = 0; i < NONCE_SIZE; i++){
+        printf("%02x", nonce[i]);
+    }
 
     sodium_memzero(ciphertext, sizeof(ciphertext));
     sodium_memzero(nonce, NONCE_SIZE);
@@ -257,7 +280,57 @@ void first_time(unsigned char *key_out){
     fwrite(nonce, 1, NONCE_SIZE, file);
     fwrite(ciphertext, 1, sizeof(ciphertext), file);
     fclose(file);
+    for (int i = 0; i < crypto_secretbox_KEYBYTES; i++){
+        printf("%02x", key_out[i]);
+    }
 
     sodium_memzero(user_pwd, sizeof(user_pwd));
-    sodium_memzero(key_out, crypto_secretbox_KEYBYTES);
+}
+
+void search_pwd(unsigned char *key_out){
+    Record records[MAX_RECORD];
+    FILE *file = fopen("database.bin","rb");
+
+    unsigned char header[SALT_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH];
+    fread(header, 1, HEADER_SIZE, file);
+
+    int count  = 0;
+    
+    while(count < MAX_RECORD){
+        if(fread(records[count].name, 1, NAME_SIZE, file) != NAME_SIZE) {
+            break;
+        } records[count].name[NAME_SIZE - 1] = '\0';
+
+        if(fread(records[count].username, 1, NAME_SIZE, file) != NAME_SIZE) {
+            break;
+        } records[count].username[NAME_SIZE - 1] = '\0';
+
+        if(fread(records[count].nonce, 1, NONCE_SIZE, file) != NONCE_SIZE) {
+            break;
+        }
+            
+        unsigned char ciphertext[crypto_secretbox_MACBYTES + PWD_LENGTH];
+        if(fread(ciphertext, 1, crypto_secretbox_MACBYTES+PWD_LENGTH, file) != crypto_secretbox_MACBYTES+PWD_LENGTH) {
+            break;
+        }
+        if (crypto_secretbox_open_easy(records[count].pwd, ciphertext, crypto_secretbox_MACBYTES+PWD_LENGTH, records[count].nonce, key_out) != 0) {
+            printf("%s !!! %s", records[count].pwd,ciphertext);
+            fclose(file);
+            return;
+        }
+        printf("\n");
+        count++;
+    } 
+
+    if (count == 0){
+        printf("You have stored no password yet.\n");
+    }
+    fclose(file);
+
+    printf(" name / username-email / password\n");
+    printf("==================================\n");
+    for(int i = 0; i<count; i++){
+        printf("%s {%s, %s}\n", records[i].name,records[i].username,records[i].pwd);
+    }
+    printf("You have %d password stored. you have enough space for %d more.", count, MAX_RECORD - count);
 }
