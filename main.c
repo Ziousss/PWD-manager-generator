@@ -23,6 +23,7 @@ void see_pwd(unsigned char *key_out);
 void search_pwd(unsigned char *key_out, unsigned char *name);
 bool part_of(char *search, char *name);
 void change_pwd(unsigned char *key_out);
+void delete_pwd(unsigned char *key_out)
 
 
 /* Struct */
@@ -91,7 +92,7 @@ int main(int argc, char* argv[]){
             change_pwd(key);
         }
         else if (realNum == 5){
-            //delete the pwd for a specific thing
+            delete_pwd(key);
         }
         else if (realNum == 6){
             sodium_memzero(key, crypto_secretbox_KEYBYTES);
@@ -233,9 +234,6 @@ void add_pwd(unsigned char *key_out){
     fwrite(nonce, 1, NONCE_SIZE, file); 
     fwrite(ciphertext, 1, sizeof(ciphertext), file);  
     fclose(file);
-    for (int i = 0; i < NONCE_SIZE; i++){
-        printf("%02x", nonce[i]);
-    }
 
     sodium_memzero(ciphertext, sizeof(ciphertext));
     sodium_memzero(nonce, NONCE_SIZE);
@@ -577,5 +575,32 @@ void change_pwd(unsigned char *key_out){
 
     fclose(file);
     system("stty echo");
+    sodium_memzero(ciphertext, sizeof(ciphertext));
+    sodium_memzero(records[index].nonce, NONCE_SIZE);
+
     return;
+}
+
+void delete_pwd(unsigned char *key_out){
+    //prompt pour le password a delete
+    Record records[MAX_RECORD];
+    unsigned char to_delete[NAME_SIZE];
+    printf("What is the name of the app/program you want to delete?\n");
+    fgets(to_delete, NAME_SIZE, stdin);
+    to_delete[strcspn(to_delete,"\n")] = '\0';
+
+    int index = -1;
+
+
+
+
+
+
+    if (index == -1){
+        printf("No results found\n");
+        printf("Did you mean one of those? \n");
+        search_pwd(key_out, to_delete);
+    }
+    //confirmer 
+    //enelever du fichier 
 }
