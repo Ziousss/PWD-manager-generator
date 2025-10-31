@@ -20,7 +20,7 @@ bool pwd_verif(unsigned char *key_out);
 void add_pwd(unsigned char *key_out);
 void first_time(unsigned char *key_out);
 void see_pwd(unsigned char *key_out);
-void search_pwd(unsigned char *key_out);
+void search_pwd(unsigned char *key_out, unsigned char *name);
 bool part_of(char *search, char *name);
 void change_pwd(unsigned char *key_out);
 
@@ -85,7 +85,7 @@ int main(int argc, char* argv[]){
             see_pwd(key);
         }
         else if (realNum == 3){
-            search_pwd(key);
+            search_pwd(key, NULL);
         }
         else if (realNum == 4){
             change_pwd(key);
@@ -356,13 +356,21 @@ void see_pwd(unsigned char *key_out){
     printf("\nYou have %d password stored. you have enough space for %d more.\n", count, MAX_RECORD - count);
 }
 
-void search_pwd(unsigned char *key_out){
+void search_pwd(unsigned char *key_out, unsigned char *name){
     Record records[MAX_RECORD];
 
-    char name[NAME_SIZE];
-    printf("For what app are you looking for / What username are you looking for: ");
-    fgets(name,sizeof(name),stdin);
-    name[strcspn(name, "\n")] = '\0';
+    char name_buf[NAME_SIZE];
+    unsigned char *search_name;
+
+    if(name == NULL){
+        printf("For what app are you looking for / What username are you looking for: ");
+        fgets(name_buf, sizeof(name_buf), stdin);
+        name_buf[strcspn(name_buf, "\n")] = '\0';
+        search_name = (unsigned char*)name_buf;
+    } else {
+        search_name = name;
+    }
+    
 
     FILE *file = fopen("database.bin","r+b");
     if(file == NULL){
@@ -382,7 +390,7 @@ void search_pwd(unsigned char *key_out){
         if(fread(records[count].name, 1, NAME_SIZE, file) != NAME_SIZE) {
             break;
         } records[count].name[NAME_SIZE - 1] = '\0';
-        if (part_of(name, records[count].name)){
+        if (part_of(search_name, records[count].name)){
             consider[index] = count;
             index++;
             found = true;
@@ -391,8 +399,8 @@ void search_pwd(unsigned char *key_out){
         if(fread(records[count].username, 1, NAME_SIZE, file) != NAME_SIZE) {
             break;
         } records[count].username[NAME_SIZE - 1] = '\0';
-        if (part_of(name, records[count].username)){
-            if (strcmp(records[count].name, records[count].username) != 0){
+        if (part_of(search_name, records[count].username)){
+            if (part_of(records[count].name, records[count].username)){
                 consider[index] = count;
                 index++;
                 found = true;
@@ -495,6 +503,8 @@ void change_pwd(unsigned char *key_out){
 
     if(index == -1){
         printf("No result.\n");
+        printf("Did you mean one of those ?\n");
+        search_pwd(key_out, name_search);
         fclose(file);
         return;
     }
@@ -529,13 +539,15 @@ void change_pwd(unsigned char *key_out){
     system("stty -echo");
     fgets(new_pwd, sizeof(new_pwd), stdin); 
     new_pwd[strcspn(new_pwd, "\n")] = '\0';
-    do{
-        printf("New password cannot be the same as the prious one.\n");
-        fgets(new_pwd, sizeof(new_pwd), stdin); 
-        new_pwd[strcspn(new_pwd, "\n")] = '\0';
+    if(strcmp(new_pwd, records[index].pwd) == 0){
+        do{
+            printf("New password cannot be the same as the prious one.\n");
+            fgets(new_pwd, sizeof(new_pwd), stdin); 
+            new_pwd[strcspn(new_pwd, "\n")] = '\0';
 
-    } while(strcmp(new_pwd, records[index].pwd) == 0);
-
+        } while(strcmp(new_pwd, records[index].pwd) == 0);
+    }
+    
     printf("Confirm your new password\n");
     fgets(conf_new_pwd, sizeof(conf_new_pwd), stdin); 
     conf_new_pwd[strcspn(conf_new_pwd, "\n")] = '\0';
