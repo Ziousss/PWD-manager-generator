@@ -23,7 +23,8 @@ void see_pwd(unsigned char *key_out);
 void search_pwd(unsigned char *key_out, unsigned char *name);
 bool part_of(char *search, char *name);
 void change_pwd(unsigned char *key_out);
-void delete_pwd(unsigned char *key_out)
+void delete_pwd(unsigned char *key_out);
+void print_names();
 
 
 /* Struct */
@@ -582,25 +583,78 @@ void change_pwd(unsigned char *key_out){
 }
 
 void delete_pwd(unsigned char *key_out){
-    //prompt pour le password a delete
+    //prompt pour le password a enlever
     Record records[MAX_RECORD];
     unsigned char to_delete[NAME_SIZE];
+    print_names();
     printf("What is the name of the app/program you want to delete?\n");
     fgets(to_delete, NAME_SIZE, stdin);
     to_delete[strcspn(to_delete,"\n")] = '\0';
 
     int index = -1;
 
+    FILE *file = fopen("database.bin", "r+b");
 
+    unsigned char header[HEADER_SIZE];
+    fread(header, 1, HEADER_SIZE, file);
 
+    unsigned char ciphertext[crypto_secretbox_MACBYTES+PWD_LENGTH];
 
+    for (int i = 0; i < MAX_RECORD; i++) {
+        long start_pos = ftell(file);
 
+        if (fread(records[i].name, 1, NAME_SIZE, file) != NAME_SIZE) break;
+        fread(records[i].username, 1, NAME_SIZE, file);
+        fread(records[i].nonce, 1, NONCE_SIZE, file);
+        fread(ciphertext, 1, sizeof(ciphertext), file);
+
+        if (strcmp(records[i].name, to_delete) == 0) {
+            index = i;
+        }
+    }   
 
     if (index == -1){
         printf("No results found\n");
-        printf("Did you mean one of those? \n");
+        printf("Did you mean one of those? [name/N]\n");
         search_pwd(key_out, to_delete);
+        char conf[NAME_SIZE];
+        fgets(conf, NAME_SIZE, stdin);
+        conf[strcspn(conf, "\n")]='\0';
+
+        if(strcmp(conf,"n") == 0 || strcmp(conf,"N") == 0){
+            printf("code");
+            return;
+        }
+        strcpy(to_delete,conf);
     }
-    //confirmer 
+
+
+
+
     //enelever du fichier 
+}
+
+void print_names(){
+    FILE *file = fopen("database.bin", "rb");
+    Record records[MAX_RECORD];
+
+    unsigned char header[HEADER_SIZE];
+    fread(header,1, HEADER_SIZE, file);
+
+    int count = 0;
+    while(count < MAX_RECORD){
+        if (fread(records[count].name, 1, NAME_SIZE, file) != NAME_SIZE) break;
+        fread(records[count].username, 1, NAME_SIZE, file);
+        fread(records[count].nonce, 1, NONCE_SIZE, file);
+        fread(records[count].pwd, 1, crypto_secretbox_MACBYTES+PWD_LENGTH, file);
+        count++;
+    }
+
+    printf(" name / username-email\n");
+    printf("=======================\n");
+    for (int i =0; i<count; i++){
+        printf("%s / %s\n", records[i].name, records[i].username);
+    }
+
+    return;
 }
