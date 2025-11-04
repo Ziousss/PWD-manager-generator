@@ -10,4 +10,4 @@
 #define PWD_LENGTH 50
 #define HEADER_SIZE (SALT_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH)
 
-#endif 
+#endif
