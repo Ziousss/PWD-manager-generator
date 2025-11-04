@@ -1,6 +1,3 @@
-// To compile with gcc : gcc main.c -o main -lm -lsodium
-
-/* Includes */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -11,34 +8,8 @@
 #include <unistd.h>
 #include <math.h>
 
-/* Definitions */
-#define MAX_RECORD 256
-#define NAME_SIZE 50
-#define SALT_SIZE 16
-#define NONCE_SIZE 24
-#define PWD_LENGTH 50
-#define HEADER_SIZE (SALT_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH)
-
-/* Function signatures*/
-bool pwd_verif(unsigned char *key_out);
-void add_pwd(unsigned char *key_out);
-void first_time(unsigned char *key_out);
-void see_pwd(unsigned char *key_out);
-void search_pwd(unsigned char *key_out, unsigned char *name);
-bool part_of(char *search, char *name);
-void change_pwd(unsigned char *key_out);
-void delete_pwd(unsigned char *key_out);
-int print_names(unsigned char *name);
-char* pwd_level(unsigned char *pwd);
-char* pwd_generator();
-
-/* Struct */
-typedef struct {
-    char name[NAME_SIZE];
-    char username[NAME_SIZE];
-    char pwd[crypto_secretbox_MACBYTES + PWD_LENGTH]; 
-    unsigned char nonce [crypto_secretbox_NONCEBYTES];
-} Record;
+#include "main.h"
+#include "defs.h"
 
 /* Function's code */
 int main(int argc, char* argv[]){
