@@ -1,6 +1,7 @@
 pwd-manager
 database.bin
 .vscode/
+main
 
 # Prerequisites
 *.d
