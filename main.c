@@ -30,6 +30,7 @@ void change_pwd(unsigned char *key_out);
 void delete_pwd(unsigned char *key_out);
 int print_names(unsigned char *name);
 char* pwd_level(unsigned char *pwd);
+void pwd_generator();
 
 /* Struct */
 typedef struct {
@@ -75,7 +76,7 @@ int main(int argc, char* argv[]){
     }
     while(1){
         printf("\nWhat do you want to do ?\n"); 
-        printf("1. Add new password\n2. See current password\n3. Search password\n4. Change existing password\n5. Delete a password from the list\n6. exit\n");
+        printf("1. Add new password\n2. See current password\n3. Search password\n4. Change existing password\n5. Delete a password from the list\n6. Generate a strong password\n7. Exit");
         fgets(myNum,sizeof(myNum),stdin);
         int realNum = atoi(myNum);
 
@@ -101,6 +102,8 @@ int main(int argc, char* argv[]){
             delete_pwd(key);
         }
         else if (realNum == 6){
+            pwd_generator();
+        } else if (realNum == 7){
             sodium_memzero(key, crypto_secretbox_KEYBYTES);
             return 0;
         }
@@ -213,7 +216,8 @@ void add_pwd(unsigned char *key_out){
     fgets(new_username, sizeof(new_username), stdin);
     new_username[strcspn(new_username, "\n")] = '\0';
 
-    char new_pwd[50];
+    system("stty -echo");
+    char new_pwd[PWD_LENGTH];
     memset(new_pwd, 0, PWD_LENGTH);
     printf("What is the password?\n");
     fgets(new_pwd, sizeof(new_pwd), stdin);
@@ -223,6 +227,7 @@ void add_pwd(unsigned char *key_out){
         printf ("invalid password.\n");
         return;
     }
+    system("stty echo");
 
     char answer[3];
     printf("This password is %s. Do you want to keep it? [Y/N]\n", level);
@@ -239,6 +244,19 @@ void add_pwd(unsigned char *key_out){
         printf("Password discarded.\n");
         return;
     }
+
+    system("stty -echo");
+    char new_pwd_conf[PWD_LENGTH];
+    memset(new_pwd_conf, 0, PWD_LENGTH);
+    printf("Please confirm your password?\n");
+    fgets(new_pwd_conf, sizeof(new_pwd_conf), stdin);
+    new_pwd_conf[strcspn(new_pwd_conf, "\n")] = '\0';
+    if(strcmp(new_pwd,new_pwd_conf)!=0){
+        printf("Not matching.\n");
+        return;
+    }
+    system("stty echo");
+
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
     randombytes_buf(nonce, sizeof(nonce)); 
 
@@ -783,8 +801,24 @@ char* pwd_level(unsigned char *pwd){
         return "Weak";
     else if (level < 60)
         return "Moderate";
-    else if (level < 128)
+    else if (level < 90)
         return "Strong";
     else
         return "Very Strong";
+}
+
+void pwd_generator(){
+    char* possibleChar = "2z9+ib|meLVw6>W/&C?!@r$d<8SPxTGOkl,hK%%-4NF.0nca)5DqZJQ3U(XMAvgtj*s=I7B^1_pYfyHoE;";
+    int length = 15 + rand()%5;
+    char* pwd = malloc(length+1);
+    int len_pos = strlen(possibleChar);
+    while(strcmp("Strong", pwd_level(pwd))!=0 && strcmp("Very strong", pwd_level(pwd))!=0){
+        for(int i = 0; i < length; i ++){
+        int value = rand()%len_pos;
+        pwd[i] = possibleChar[value];
+        }
+        pwd[length] = '\0';
+    }
+    printf("%s %s",pwd, pwd_level(pwd));
+    free(pwd);
 }
