@@ -1,3 +1,5 @@
+// To compile with gcc : gcc main.c -o main -lm -lsodium
+
 /* Includes */
 #include <stdio.h>
 #include <string.h>
@@ -66,7 +68,9 @@ int main(int argc, char* argv[]){
                 printf("\nWrong password, %d tries left\n", 3-i);
                 found = pwd_verif(key);
             } while(!found && i != 3);
-            return -1;
+            if(i == 3){
+                return -1;
+            }
         }
     }
     while(1){
@@ -223,7 +227,16 @@ void add_pwd(unsigned char *key_out){
     char answer[3];
     printf("This password is %s. Do you want to keep it? [Y/N]\n", level);
     fgets(answer, sizeof(answer),stdin);
-    if (strcmp(answer,"N\n")==0 || strcmp(answer,"n\n")==0){
+    
+    while (strcmp(answer, "Y\n") != 0 && strcmp(answer, "y\n") != 0 && strcmp(answer, "N\n") != 0 && strcmp(answer, "n\n") != 0) {
+        printf("Invalid input. Please enter Y or N:\n");
+        fgets(answer, sizeof(answer), stdin);
+    }
+
+    if (strcmp(answer, "Y\n") == 0 || strcmp(answer, "y\n") == 0) {
+        printf("Password kept.\n");
+    } else {
+        printf("Password discarded.\n");
         return;
     }
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
@@ -371,7 +384,7 @@ void see_pwd(unsigned char *key_out){
     printf(" name / username-email / password\n");
     printf("==================================\n");
     for(int i = 0; i<count; i++){
-        printf("%s {%s, %s}\n", records[i].name,records[i].username,records[i].pwd);
+        printf("%s {%s, %s (%s)}\n", records[i].name,records[i].username,records[i].pwd, pwd_level(records[i].pwd));
     }
     printf("\nYou have %d password stored. you have enough space for %d more.\n", count, MAX_RECORD - count);
 }
@@ -455,7 +468,7 @@ void search_pwd(unsigned char *key_out, unsigned char *name){
     printf(" name / username-email / password\n");
     printf("==================================\n");
     for(int i = 0; i < index; i++){
-        printf("%s {%s, %s}\n", records[consider[i]].name,records[consider[i]].username,records[consider[i]].pwd);
+        printf("%s {%s, %s (%s)}\n", records[consider[i]].name,records[consider[i]].username,records[consider[i]].pwd,pwd_level(records[consider[i]].pwd));
     }
 }
 
@@ -536,7 +549,7 @@ void change_pwd(unsigned char *key_out){
     printf(" name / username-email / password\n");
     printf("==================================\n");
 
-    printf("%s {%s, %s}\n", records[index].name,records[index].username, records[index].pwd);
+    printf("%s {%s, %s (%s)}\n", records[index].name,records[index].username, records[index].pwd, pwd_level(records[index].pwd));
 
     char answer[10];
     do{
@@ -567,7 +580,8 @@ void change_pwd(unsigned char *key_out){
         } while(strcmp(new_pwd, records[index].pwd) == 0);
     }
     
-    printf("Confirm your new password\n");
+    char *level = pwd_level(new_pwd);
+    printf("This password is %s, confirm it.\n", level);
     fgets(conf_new_pwd, sizeof(conf_new_pwd), stdin); 
     conf_new_pwd[strcspn(conf_new_pwd, "\n")] = '\0';
 
