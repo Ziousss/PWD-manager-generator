@@ -30,7 +30,7 @@ void change_pwd(unsigned char *key_out);
 void delete_pwd(unsigned char *key_out);
 int print_names(unsigned char *name);
 char* pwd_level(unsigned char *pwd);
-void pwd_generator();
+char* pwd_generator();
 
 /* Struct */
 typedef struct {
@@ -76,7 +76,7 @@ int main(int argc, char* argv[]){
     }
     while(1){
         printf("\nWhat do you want to do ?\n"); 
-        printf("1. Add new password\n2. See current password\n3. Search password\n4. Change existing password\n5. Delete a password from the list\n6. Generate a strong password\n7. Exit");
+        printf("1. Add new password\n2. See current password\n3. Search password\n4. Change existing password\n5. Delete a password from the list\n6. Generate a strong password\n7. Exit\n");
         fgets(myNum,sizeof(myNum),stdin);
         int realNum = atoi(myNum);
 
@@ -102,7 +102,8 @@ int main(int argc, char* argv[]){
             delete_pwd(key);
         }
         else if (realNum == 6){
-            pwd_generator();
+            char* pwd = pwd_generator();
+            free(pwd);
         } else if (realNum == 7){
             sodium_memzero(key, crypto_secretbox_KEYBYTES);
             return 0;
@@ -569,7 +570,7 @@ void change_pwd(unsigned char *key_out){
 
     printf("%s {%s, %s (%s)}\n", records[index].name,records[index].username, records[index].pwd, pwd_level(records[index].pwd));
 
-    char answer[10];
+    char answer[3];
     do{
         printf("Is this what you want to change? [Y/N]");
         fgets(answer, sizeof(answer), stdin);   
@@ -585,36 +586,56 @@ void change_pwd(unsigned char *key_out){
 
     char new_pwd[PWD_LENGTH];
     char conf_new_pwd[PWD_LENGTH];
-    printf("What is the new password?\n");
-    system("stty -echo");
-    fgets(new_pwd, sizeof(new_pwd), stdin); 
-    new_pwd[strcspn(new_pwd, "\n")] = '\0';
-    if(strcmp(new_pwd, records[index].pwd) == 0){
-        do{
-            printf("New password cannot be the same as the prious one.\n");
-            fgets(new_pwd, sizeof(new_pwd), stdin); 
-            new_pwd[strcspn(new_pwd, "\n")] = '\0';
-
-        } while(strcmp(new_pwd, records[index].pwd) == 0);
-    }
-    
-    char *level = pwd_level(new_pwd);
-    printf("This password is %s, confirm it.\n", level);
-    fgets(conf_new_pwd, sizeof(conf_new_pwd), stdin); 
-    conf_new_pwd[strcspn(conf_new_pwd, "\n")] = '\0';
-
-    if(strcmp(conf_new_pwd, new_pwd)!=0 || strcmp(new_pwd, records[index].pwd) == 0){
-        do{
-            printf("Both password do not match. Press 1 to change the original password.\n");
-            fgets(conf_new_pwd, sizeof(conf_new_pwd), stdin); 
-            conf_new_pwd[strcspn(conf_new_pwd, "\n")] = '\0';
-            if(strcmp(conf_new_pwd, "1") == 0){
-                printf("What is the new password?\n");
-                fgets(new_pwd, sizeof(new_pwd), stdin);
-                new_pwd[strcspn(new_pwd, "\n")] = '\0';
+    do{
+        printf("Do you want to auto generate it? [Y/N]\n");
+        fgets(answer,sizeof(answer),stdin);
+    }while (strcmp(answer,"N\n") != 0 && strcmp(answer,"n\n") != 0 && strcmp(answer,"Y\n") != 0 && strcmp(answer,"y\n") != 0);
+    char *pwd;
+    if(strcmp(answer,"Y\n") == 0 || strcmp(answer,"y\n") == 0){
+        do
+        {   
+            pwd = pwd_generator();
+            printf("\nDo you like this password? [Y/N] Press 1 to return.\n");
+            fgets(answer,sizeof(answer),stdin);
+            if(strcmp("1\n", answer) == 0){
+                return;
             }
+        } while (strcmp(answer,"Y\n") != 0 && strcmp(answer,"y\n") != 0);
+        strcpy(new_pwd,pwd);
+        free(pwd);
+        
+    } else {
+        printf("What is the new password?\n");
+        system("stty -echo");
+        fgets(new_pwd, sizeof(new_pwd), stdin); 
+        new_pwd[strcspn(new_pwd, "\n")] = '\0';
+        if(strcmp(new_pwd, records[index].pwd) == 0){
+            do{
+                printf("New password cannot be the same as the prious one.\n");
+                fgets(new_pwd, sizeof(new_pwd), stdin); 
+                new_pwd[strcspn(new_pwd, "\n")] = '\0';
 
-        } while(strcmp(conf_new_pwd,new_pwd)!= 0 || strcmp(new_pwd, records[index].pwd) == 0);
+            } while(strcmp(new_pwd, records[index].pwd) == 0);
+        }
+        
+        char *level = pwd_level(new_pwd);
+        printf("This password is %s, confirm it.\n", level);
+        fgets(conf_new_pwd, sizeof(conf_new_pwd), stdin); 
+        conf_new_pwd[strcspn(conf_new_pwd, "\n")] = '\0';
+
+        if(strcmp(conf_new_pwd, new_pwd)!=0 || strcmp(new_pwd, records[index].pwd) == 0){
+            do{
+                printf("Both password do not match. Press 1 to change the original password.\n");
+                fgets(conf_new_pwd, sizeof(conf_new_pwd), stdin); 
+                conf_new_pwd[strcspn(conf_new_pwd, "\n")] = '\0';
+                if(strcmp(conf_new_pwd, "1") == 0){
+                    printf("What is the new password?\n");
+                    fgets(new_pwd, sizeof(new_pwd), stdin);
+                    new_pwd[strcspn(new_pwd, "\n")] = '\0';
+                }
+
+            } while(strcmp(conf_new_pwd,new_pwd)!= 0 || strcmp(new_pwd, records[index].pwd) == 0);
+        }
     }
 
     unsigned char new_ciphertext[crypto_secretbox_MACBYTES+PWD_LENGTH];
@@ -807,18 +828,18 @@ char* pwd_level(unsigned char *pwd){
         return "Very Strong";
 }
 
-void pwd_generator(){
+char* pwd_generator(){
     char* possibleChar = "2z9+ib|meLVw6>W/&C?!@r$d<8SPxTGOkl,hK%%-4NF.0nca)5DqZJQ3U(XMAvgtj*s=I7B^1_pYfyHoE;";
     int length = 15 + rand()%5;
     char* pwd = malloc(length+1);
     int len_pos = strlen(possibleChar);
-    while(strcmp("Strong", pwd_level(pwd))!=0 && strcmp("Very strong", pwd_level(pwd))!=0){
+    do{
         for(int i = 0; i < length; i ++){
         int value = rand()%len_pos;
         pwd[i] = possibleChar[value];
         }
         pwd[length] = '\0';
-    }
+    }while(strcmp("Strong", pwd_level(pwd))!=0 && strcmp("Very strong", pwd_level(pwd))!=0);
     printf("%s %s",pwd, pwd_level(pwd));
-    free(pwd);
+    return pwd;
 }
