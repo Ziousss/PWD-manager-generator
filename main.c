@@ -582,7 +582,6 @@ void change_pwd(unsigned char *key_out){
 }
 
 void delete_pwd(unsigned char *key_out){
-    //prompt pour le password a enlever
     Record records[MAX_RECORD];
     unsigned char to_delete[NAME_SIZE];
     printf("What is the name of the app/program you want to delete?\n");
@@ -614,10 +613,18 @@ void delete_pwd(unsigned char *key_out){
         printf("No results found\n");
         if(print_names(to_delete) == 0){
             printf("Did you mean one of these? [complete name/N]\n");    
-            fclose(file);
             return;
         }
     } 
+    char answer[3];
+    printf("Are you sure you want to delete %s? [Y/N]\n",records[index].name);
+    fgets(answer, sizeof(answer),stdin);
+
+    if(strcmp(answer,"n\n")==0 || strcmp(answer,"N\n")==0){
+        return;
+    }
+
+
     printf("Total records: %d, Delete index: %d\n", count, index);
 
     int write = 0;
@@ -633,8 +640,6 @@ void delete_pwd(unsigned char *key_out){
         }        
     }
 
-
-    // truncate the file to remove old leftover data
     fflush(file);
     fclose(file);
 
