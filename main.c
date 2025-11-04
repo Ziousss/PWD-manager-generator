@@ -7,6 +7,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <math.h>
 
 /* Definitions */
 #define MAX_RECORD 256
@@ -26,7 +27,7 @@ bool part_of(char *search, char *name);
 void change_pwd(unsigned char *key_out);
 void delete_pwd(unsigned char *key_out);
 int print_names(unsigned char *name);
-
+char* pwd_level(unsigned char *pwd);
 
 /* Struct */
 typedef struct {
@@ -213,7 +214,18 @@ void add_pwd(unsigned char *key_out){
     printf("What is the password?\n");
     fgets(new_pwd, sizeof(new_pwd), stdin);
     new_pwd[strcspn(new_pwd, "\n")] = '\0';
+    char *level = pwd_level(new_pwd);
+    if(strcmp(level, "invalid")==0){
+        printf ("invalid password.\n");
+        return;
+    }
 
+    char answer[3];
+    printf("This password is %s. Do you want to keep it? [Y/N]\n", level);
+    fgets(answer, sizeof(answer),stdin);
+    if (strcmp(answer,"N\n")==0 || strcmp(answer,"n\n")==0){
+        return;
+    }
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
     randombytes_buf(nonce, sizeof(nonce)); 
 
@@ -251,10 +263,17 @@ void first_time(unsigned char *key_out){
     printf("Password: ");
     fgets(user_pwd, PWD_LENGTH, stdin);
     user_pwd[strcspn(user_pwd, "\n")] = '\0';
+    char* level = pwd_level(user_pwd);
 
-    do {
-        //ok will become the level of the user_pwd
-        printf("This password is ok. Please confirm by retyping it. Press 1 to change the original password.");
+    while(1){
+        while (strcmp(level, "Invalid") == 0) {
+            printf("Invalid password. Please enter again: ");
+            fgets(user_pwd, PWD_LENGTH, stdin);
+            level = pwd_level(user_pwd);  
+        }
+
+        user_pwd[strcspn(user_pwd, "\n")] = '\0';
+        printf("This password is %s. Please confirm by retyping it. Press 1 to change the original password.\n",level);
         printf("Password: ");
         fgets(conf_user_pwd, PWD_LENGTH, stdin);
         conf_user_pwd[strcspn(conf_user_pwd, "\n")] = '\0';
@@ -263,9 +282,11 @@ void first_time(unsigned char *key_out){
             printf("Change orignial password: ");
             fgets(user_pwd, PWD_LENGTH, stdin);
             user_pwd[strcspn(user_pwd, "\n")] = '\0';
+        } else if (strcmp(user_pwd,conf_user_pwd)==0){  
+            break;
         }
+    }
 
-    } while (strcmp(user_pwd,conf_user_pwd) != 0);
 
     if (sodium_init() < 0) {
         return;
@@ -719,4 +740,37 @@ int print_names(unsigned char *name){
         printf("%s / %s\n", records[consider[i]].name,records[consider[i]].username);
     }
     return 0;
+}
+
+char* pwd_level(unsigned char *pwd){
+    int lowercase = 0;
+    int uppercase = 0;
+    int digit = 0;
+    int specialcase = 0;
+    for(int i = 0;i< strlen(pwd); i++){
+        if(pwd[i] >= 'a' && pwd[i] <= 'z'){
+            lowercase = 26;
+        } else if (pwd[i] >= 'A' && pwd[i] <= 'Z'){
+            uppercase = 26;
+        } else if(pwd[i] == ' '){
+            return "Invalid";
+        } else if (isdigit(pwd[i])){
+            digit = 10;
+        } else {
+            specialcase = 32;
+        }
+    }
+
+    int level = strlen(pwd)*log(lowercase+uppercase+specialcase+digit);
+
+    if (level < 28)
+        return "Very Weak";
+    else if (level < 36)
+        return "Weak";
+    else if (level < 60)
+        return "Moderate";
+    else if (level < 128)
+        return "Strong";
+    else
+        return "Very Strong";
 }
