@@ -12,14 +12,15 @@ bool part_of(char *search, char *name);
 void change_pwd(unsigned char *key_out);
 void delete_pwd(unsigned char *key_out);
 int print_names(unsigned char *name);
-char* pwd_level(unsigned char *pwd);
-char* pwd_generator();
+char *pwd_level(unsigned char *pwd);
+char *pwd_generator();
 
-typedef struct {
+typedef struct
+{
     char name[NAME_SIZE];
     char username[NAME_SIZE];
     unsigned char pwd[crypto_secretbox_MACBYTES + PWD_LENGTH];
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
 } Record;
 
-#endif 
+#endif
