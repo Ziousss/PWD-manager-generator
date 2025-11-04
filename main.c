@@ -6,6 +6,7 @@
 #include <sodium.h>
 #include <time.h>
 #include <ctype.h>
+#include <unistd.h>
 
 /* Definitions */
 #define MAX_RECORD 256
@@ -31,8 +32,7 @@ int print_names(unsigned char *name);
 typedef struct {
     char name[NAME_SIZE];
     char username[NAME_SIZE];
-    char crypted_pwd[NAME_SIZE];
-    char pwd[NAME_SIZE]; 
+    char pwd[crypto_secretbox_MACBYTES + PWD_LENGTH]; 
     unsigned char nonce [crypto_secretbox_NONCEBYTES];
 } Record;
 
@@ -561,7 +561,7 @@ void change_pwd(unsigned char *key_out){
                 new_pwd[strcspn(new_pwd, "\n")] = '\0';
             }
 
-        }while(strcmp(conf_new_pwd,new_pwd)!= 0 || strcmp(new_pwd, records[index].pwd) == 0);
+        } while(strcmp(conf_new_pwd,new_pwd)!= 0 || strcmp(new_pwd, records[index].pwd) == 0);
     }
 
     unsigned char new_ciphertext[crypto_secretbox_MACBYTES+PWD_LENGTH];
@@ -571,7 +571,7 @@ void change_pwd(unsigned char *key_out){
     fwrite(records[index].name, 1, NAME_SIZE, file);
     fwrite(new_username, 1, NAME_SIZE, file);
     fwrite(records[index].nonce, 1, NONCE_SIZE, file);
-    fwrite(new_ciphertext, 1, PWD_LENGTH, file);
+    fwrite(new_ciphertext, 1, crypto_secretbox_MACBYTES+PWD_LENGTH, file);
 
     fclose(file);
     system("stty echo");
@@ -591,25 +591,25 @@ void delete_pwd(unsigned char *key_out){
 
     int index = -1;
 
-    FILE *file = fopen("database.bin", "r+b");
+    FILE *file = fopen("database.bin", "rb");
 
     unsigned char header[HEADER_SIZE];
     fread(header, 1, HEADER_SIZE, file);
 
-    unsigned char ciphertext[crypto_secretbox_MACBYTES+PWD_LENGTH];
     int count = 0;
     for (int i = 0; i < MAX_RECORD; i++) {
         if (fread(records[i].name, 1, NAME_SIZE, file) != NAME_SIZE) break;
-        fread(records[i].username, 1, NAME_SIZE, file);
-        fread(records[i].nonce, 1, NONCE_SIZE, file);
-        fread(records[i].pwd, 1,crypto_secretbox_MACBYTES+PWD_LENGTH , file);
+        if (fread(records[i].username, 1, NAME_SIZE, file) != NAME_SIZE) break;
+        if (fread(records[i].nonce, 1, NONCE_SIZE, file) != NONCE_SIZE) break;
+        if (fread(records[i].pwd, 1, crypto_secretbox_MACBYTES + PWD_LENGTH, file) != crypto_secretbox_MACBYTES + PWD_LENGTH) break;
         count++;
 
         if (strcmp(records[i].name, to_delete) == 0) {
             index = i;
         }
     }   
-
+   
+    fclose(file);
     if (index == -1){
         printf("No results found\n");
         if(print_names(to_delete) == 0){
@@ -617,22 +617,25 @@ void delete_pwd(unsigned char *key_out){
             fclose(file);
             return;
         }
-    }
+    } 
     printf("Total records: %d, Delete index: %d\n", count, index);
-    fclose(file);
-    file = fopen("database.bin", "rw");
 
     int write = 0;
+    file = fopen("database.bin","wb");
     fwrite(header,1,HEADER_SIZE,file);
     for(int i = 0; i < count; i++){
         if(i != index){
             fwrite(records[i].name,1,NAME_SIZE,file);
             fwrite(records[i].username,1,NAME_SIZE,file);
             fwrite(records[i].nonce,1,NONCE_SIZE,file);
-            fwrite(records[i].pwd,1,PWD_LENGTH,file);
+            fwrite(records[i].pwd,1,crypto_secretbox_MACBYTES + PWD_LENGTH,file);
             write++;
         }        
     }
+
+
+    // truncate the file to remove old leftover data
+    fflush(file);
     fclose(file);
 
     printf("Wrote back %d records (deleted 1)\n", write); 
