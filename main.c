@@ -217,46 +217,66 @@ void add_pwd(unsigned char *key_out){
     fgets(new_username, sizeof(new_username), stdin);
     new_username[strcspn(new_username, "\n")] = '\0';
 
-    system("stty -echo");
+    char answer[3];
+    do {
+        printf("Do you want the password to be auto-generated? [Y/N]\n");
+        fgets(answer, sizeof(answer), stdin);
+    }while( strcmp(answer, "n\n") != 0 && strcmp(answer, "N\n") != 0 && strcmp(answer, "y\n") != 0 && strcmp(answer, "Y\n") != 0);
+
     char new_pwd[PWD_LENGTH];
     memset(new_pwd, 0, PWD_LENGTH);
-    printf("What is the password?\n");
-    fgets(new_pwd, sizeof(new_pwd), stdin);
-    new_pwd[strcspn(new_pwd, "\n")] = '\0';
-    char *level = pwd_level(new_pwd);
-    if(strcmp(level, "invalid")==0){
-        printf ("invalid password.\n");
-        return;
-    }
-    system("stty echo");
-
-    char answer[3];
-    printf("This password is %s. Do you want to keep it? [Y/N]\n", level);
-    fgets(answer, sizeof(answer),stdin);
-    
-    while (strcmp(answer, "Y\n") != 0 && strcmp(answer, "y\n") != 0 && strcmp(answer, "N\n") != 0 && strcmp(answer, "n\n") != 0) {
-        printf("Invalid input. Please enter Y or N:\n");
-        fgets(answer, sizeof(answer), stdin);
-    }
-
-    if (strcmp(answer, "Y\n") == 0 || strcmp(answer, "y\n") == 0) {
-        printf("Password kept.\n");
+    char* pwd;
+    if(strcmp(answer,"Y\n") == 0 || strcmp(answer,"y\n") == 0){
+        do
+        {   
+            pwd = pwd_generator();
+            printf("\nDo you like this password? [Y/N] Press 1 to return.\n");
+            fgets(answer,sizeof(answer),stdin);
+            if(strcmp("1\n", answer) == 0){
+                return;
+            }
+        } while (strcmp(answer,"Y\n") != 0 && strcmp(answer,"y\n") != 0);
+        strcpy(new_pwd,pwd);
+        free(pwd);
     } else {
-        printf("Password discarded.\n");
-        return;
-    }
+        system("stty -echo");
+        printf("What is the password?\n");
+        fgets(new_pwd, sizeof(new_pwd), stdin);
+        new_pwd[strcspn(new_pwd, "\n")] = '\0';
+        char *level = pwd_level(new_pwd);
+        if(strcmp(level, "invalid")==0){
+            printf ("invalid password.\n");
+            return;
+        }
+        system("stty echo");
 
-    system("stty -echo");
-    char new_pwd_conf[PWD_LENGTH];
-    memset(new_pwd_conf, 0, PWD_LENGTH);
-    printf("Please confirm your password?\n");
-    fgets(new_pwd_conf, sizeof(new_pwd_conf), stdin);
-    new_pwd_conf[strcspn(new_pwd_conf, "\n")] = '\0';
-    if(strcmp(new_pwd,new_pwd_conf)!=0){
-        printf("Not matching.\n");
-        return;
-    }
-    system("stty echo");
+        printf("This password is %s. Do you want to keep it? [Y/N]\n", level);
+        fgets(answer, sizeof(answer),stdin);
+        
+        while (strcmp(answer, "Y\n") != 0 && strcmp(answer, "y\n") != 0 && strcmp(answer, "N\n") != 0 && strcmp(answer, "n\n") != 0) {
+            printf("Invalid input. Please enter Y or N:\n");
+            fgets(answer, sizeof(answer), stdin);
+        }
+
+        if (strcmp(answer, "Y\n") == 0 || strcmp(answer, "y\n") == 0) {
+            printf("Password kept.\n");
+        } else {
+            printf("Password discarded.\n");
+            return;
+        }
+
+        system("stty -echo");
+        char new_pwd_conf[PWD_LENGTH];
+        memset(new_pwd_conf, 0, PWD_LENGTH);
+        printf("Please confirm your password?\n");
+        fgets(new_pwd_conf, sizeof(new_pwd_conf), stdin);
+        new_pwd_conf[strcspn(new_pwd_conf, "\n")] = '\0';
+        if(strcmp(new_pwd,new_pwd_conf)!=0){
+            printf("Not matching.\n");
+            return;
+        }
+        system("stty echo");
+        }
 
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
     randombytes_buf(nonce, sizeof(nonce)); 
@@ -452,10 +472,14 @@ void search_pwd(unsigned char *key_out, unsigned char *name){
             break;
         } records[count].username[NAME_SIZE - 1] = '\0';
         if (part_of(search_name, records[count].username)){
-            if (!part_of(records[count].name, records[count].username)){
-                consider[index] = count;
-                index++;
-                found = true;
+            for(int i = 0; i < index-1; i++){
+                if(consider[i] == index){
+                    bool found = true;
+                }
+                if(!found){
+                    consider[index] = count;
+                    index++;
+                }
             }
         }   
 
