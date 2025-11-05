@@ -65,40 +65,30 @@ int main(int argc, char *argv[])
             printf("no file detected.\n");
             return -1;
         }
-
-        if (realNum == 1)
+        switch (realNum)
         {
+        case 1:
             add_pwd(key);
-        }
-        else if (realNum == 2)
-        {
+            break;
+        case 2:
             see_pwd(key);
-        }
-        else if (realNum == 3)
-        {
-            search_pwd(key, NULL);
-        }
-        else if (realNum == 4)
-        {
+            break;
+        case 3:
+            search_pwd(key,NULL);
+            break;
+        case 4:
             change_pwd(key);
-        }
-        else if (realNum == 5)
-        {
+            break;
+        case 5:
             delete_pwd(key);
-        }
-        else if (realNum == 6)
-        {
+            break;
+        case 6:
             char *pwd = pwd_generator();
             free(pwd);
-        }
-        else if (realNum == 7)
-        {
-            sodium_memzero(key, crypto_secretbox_KEYBYTES);
-            return 0;
-        }
-        else
-        {
-            printf("Invalid number\n");
+            break;
+        default:
+            printf("Invalid number");
+            break;
         }
     }
 }
