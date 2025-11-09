@@ -95,7 +95,7 @@ int print_names(unsigned char *name)
         records[count].username[NAME_SIZE - 1] = '\0';
         if (part_of(search_name, records[count].username))
         {
-            if (part_of(records[count].name, records[count].username))
+            if (!part_of(records[count].name, records[count].username))
             {
                 consider[index] = count;
                 index++;
@@ -119,7 +119,6 @@ int print_names(unsigned char *name)
 
     if (index == 0)
     {
-        printf("No result.\n");
         return 1;
     }
 

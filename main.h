@@ -1,6 +1,14 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <sodium.h>
+#include <time.h>
+#include <ctype.h>
+#include <math.h>
 #include "defs.h"
 #include <stdbool.h>
 

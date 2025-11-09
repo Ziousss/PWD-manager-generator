@@ -151,6 +151,7 @@ void add_pwd(unsigned char *key_out)
 {
     FILE *file;
     Record records[MAX_RECORD];
+    Record *p_Record = records;
 
     char new_name[NAME_SIZE];
     memset(new_name, 0, NAME_SIZE);
@@ -171,19 +172,23 @@ void add_pwd(unsigned char *key_out)
     int count = 0;
     while (count < MAX_RECORD)
     {
-        if (fread(records[count].name, 1, NAME_SIZE, file) != NAME_SIZE)
+        if (fread(p_Record->name, 1, NAME_SIZE, file) != NAME_SIZE)
         {
             break;
         }
-        records[count].name[NAME_SIZE - 1] = '\0';
+        p_Record->name[NAME_SIZE - 1] = '\0';
+        if(strcmp(p_Record->name, new_name) == 0){
+            printf("This name already has a password.\n");
+            return;
+        }
 
-        if (fread(records[count].username, 1, NAME_SIZE, file) != NAME_SIZE)
+        if (fread(p_Record->username, 1, NAME_SIZE, file) != NAME_SIZE)
         {
             break;
         }
-        records[count].username[NAME_SIZE - 1] = '\0';
+        p_Record->username[NAME_SIZE - 1] = '\0';
 
-        if (fread(records[count].nonce, 1, NONCE_SIZE, file) != NONCE_SIZE)
+        if (fread(p_Record->nonce, 1, NONCE_SIZE, file) != NONCE_SIZE)
         {
             break;
         }
@@ -196,15 +201,6 @@ void add_pwd(unsigned char *key_out)
         count++;
     }
     fclose(file);
-
-    for (int i = 0; i < count; i++)
-    {
-        if (strcmp(records[i].name, new_name) == 0)
-        {
-            printf("This name already has a password.\n");
-            return;
-        }
-    }
 
     char new_username[NAME_SIZE];
     memset(new_username, 0, NAME_SIZE);
