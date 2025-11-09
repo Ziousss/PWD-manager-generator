@@ -1,12 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <sodium.h>
-#include <time.h>
-#include <ctype.h>
-#include <math.h>
-
 #include "main.h"
 #include "defs.h"
 #include "helperFunction.h"
@@ -578,9 +569,8 @@ void change_pwd(unsigned char *key_out)
     fgets(name_search, NAME_SIZE, stdin);
     name_search[strcspn(name_search, "\n")] = '\0';
 
-    int count = 0;
     Record records[MAX_RECORD];
-    int index = -1;
+    Record *p_Record = &records;
     bool found = false;
 
     FILE *file = fopen("database.bin", "r+b");
@@ -588,26 +578,23 @@ void change_pwd(unsigned char *key_out)
     fread(header, 1, HEADER_SIZE, file);
 
     unsigned char ciphertext[crypto_secretbox_MACBYTES + PWD_LENGTH];
-    long record_pos;
     for (int i = 0; i < MAX_RECORD; i++)
     {
-        long start_pos = ftell(file);
-
-        if (fread(records[i].name, 1, NAME_SIZE, file) != NAME_SIZE)
+        if (fread(p_Record->name, 1, NAME_SIZE, file) != NAME_SIZE)
             break;
-        fread(records[i].username, 1, NAME_SIZE, file);
-        fread(records[i].nonce, 1, NONCE_SIZE, file);
+        fread(p_Record->username, 1, NAME_SIZE, file);
+        fread(p_Record->nonce, 1, NONCE_SIZE, file);
         fread(ciphertext, 1, sizeof(ciphertext), file);
 
-        if (strcmp(records[i].name, name_search) == 0)
+        if (strcmp(p_Record->name, name_search) == 0)
         {
-            index = i;
-            record_pos = start_pos;
+            found = true;
             break;
         }
+        p_Record++;
     }
 
-    if (index == -1)
+    if (!found)
     {
         printf("No result.\n");
         printf("Did you mean one of those ?\n");
@@ -616,7 +603,7 @@ void change_pwd(unsigned char *key_out)
         return;
     }
 
-    if ((crypto_secretbox_open_easy(records[index].pwd, ciphertext, sizeof(ciphertext), records[index].nonce, key_out)) != 0)
+    if ((crypto_secretbox_open_easy(p_Record->pwd, ciphertext, sizeof(ciphertext), p_Record->nonce, key_out)) != 0)
     {
         fclose(file);
         return;
@@ -625,7 +612,7 @@ void change_pwd(unsigned char *key_out)
     printf(" name / username-email / password\n");
     printf("==================================\n");
 
-    printf("%s {%s, %s (%s)}\n", records[index].name, records[index].username, records[index].pwd, pwd_level(records[index].pwd));
+    printf("%s {%s, %s (%s)}\n", p_Record->name, p_Record->username, p_Record->pwd, pwd_level(p_Record->pwd));
 
     char answer[3];
     do
@@ -642,6 +629,7 @@ void change_pwd(unsigned char *key_out)
     printf("What is the new username?\n");
     fgets(new_username, sizeof(new_username), stdin);
     new_username[strcspn(new_username, "\n")] = '\0';
+    strcpy(p_Record->username, new_username);
 
     char new_pwd[PWD_LENGTH];
     char conf_new_pwd[PWD_LENGTH];
@@ -672,7 +660,7 @@ void change_pwd(unsigned char *key_out)
         system("stty -echo");
         fgets(new_pwd, sizeof(new_pwd), stdin);
         new_pwd[strcspn(new_pwd, "\n")] = '\0';
-        if (strcmp(new_pwd, records[index].pwd) == 0)
+        if (strcmp(new_pwd, p_Record->pwd) == 0)
         {
             do
             {
@@ -680,7 +668,7 @@ void change_pwd(unsigned char *key_out)
                 fgets(new_pwd, sizeof(new_pwd), stdin);
                 new_pwd[strcspn(new_pwd, "\n")] = '\0';
 
-            } while (strcmp(new_pwd, records[index].pwd) == 0);
+            } while (strcmp(new_pwd, p_Record->pwd) == 0);
         }
 
         char *level = pwd_level(new_pwd);
@@ -688,7 +676,7 @@ void change_pwd(unsigned char *key_out)
         fgets(conf_new_pwd, sizeof(conf_new_pwd), stdin);
         conf_new_pwd[strcspn(conf_new_pwd, "\n")] = '\0';
 
-        if (strcmp(conf_new_pwd, new_pwd) != 0 || strcmp(new_pwd, records[index].pwd) == 0)
+        if (strcmp(conf_new_pwd, new_pwd) != 0 || strcmp(new_pwd, p_Record->pwd) == 0)
         {
             do
             {
@@ -702,23 +690,23 @@ void change_pwd(unsigned char *key_out)
                     new_pwd[strcspn(new_pwd, "\n")] = '\0';
                 }
 
-            } while (strcmp(conf_new_pwd, new_pwd) != 0 || strcmp(new_pwd, records[index].pwd) == 0);
+            } while (strcmp(conf_new_pwd, new_pwd) != 0 || strcmp(new_pwd, p_Record->pwd) == 0);
         }
     }
 
     unsigned char new_ciphertext[crypto_secretbox_MACBYTES + PWD_LENGTH];
-    crypto_secretbox_easy(new_ciphertext, new_pwd, PWD_LENGTH, records[index].nonce, key_out);
+    crypto_secretbox_easy(new_ciphertext, new_pwd, PWD_LENGTH, p_Record->nonce, key_out);
 
-    fseek(file, record_pos, SEEK_SET);
-    fwrite(records[index].name, 1, NAME_SIZE, file);
-    fwrite(new_username, 1, NAME_SIZE, file);
-    fwrite(records[index].nonce, 1, NONCE_SIZE, file);
+    fseek(file, -((long)(NAME_SIZE + NAME_SIZE + NONCE_SIZE + crypto_secretbox_MACBYTES + PWD_LENGTH)), SEEK_CUR);
+    fwrite(p_Record->name, 1, NAME_SIZE, file);
+    fwrite(p_Record->username, 1, NAME_SIZE, file);
+    fwrite(p_Record->nonce, 1, NONCE_SIZE, file);
     fwrite(new_ciphertext, 1, crypto_secretbox_MACBYTES + PWD_LENGTH, file);
 
     fclose(file);
     system("stty echo");
     sodium_memzero(ciphertext, sizeof(ciphertext));
-    sodium_memzero(records[index].nonce, NONCE_SIZE);
+    sodium_memzero(p_Record->nonce, NONCE_SIZE);
 
     return;
 }
