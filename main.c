@@ -395,6 +395,7 @@ void first_time(unsigned char *key_out)
 void see_pwd(unsigned char *key_out)
 {
     Record records[MAX_RECORD];
+    Record *p_Record = records;
     FILE *file = fopen("database.bin", "rb");
     if (file == NULL)
     {
@@ -405,23 +406,22 @@ void see_pwd(unsigned char *key_out)
     unsigned char header[HEADER_SIZE];
     fread(header, 1, HEADER_SIZE, file);
 
-    int count = 0;
-
-    while (count < MAX_RECORD)
+    int i = 0;
+    while (i < MAX_RECORD)
     {
-        if (fread(records[count].name, 1, NAME_SIZE, file) != NAME_SIZE)
+        if (fread(p_Record->name, 1, NAME_SIZE, file) != NAME_SIZE)
         {
             break;
         }
-        records[count].name[NAME_SIZE - 1] = '\0';
+        p_Record->name[NAME_SIZE - 1] = '\0';
 
-        if (fread(records[count].username, 1, NAME_SIZE, file) != NAME_SIZE)
+        if (fread(p_Record->username, 1, NAME_SIZE, file) != NAME_SIZE)
         {
             break;
         }
-        records[count].username[NAME_SIZE - 1] = '\0';
+        p_Record->username[NAME_SIZE - 1] = '\0';
 
-        if (fread(records[count].nonce, 1, NONCE_SIZE, file) != NONCE_SIZE)
+        if (fread(p_Record->nonce, 1, NONCE_SIZE, file) != NONCE_SIZE)
         {
             break;
         }
@@ -431,16 +431,16 @@ void see_pwd(unsigned char *key_out)
         {
             break;
         }
-        if (crypto_secretbox_open_easy(records[count].pwd, ciphertext, crypto_secretbox_MACBYTES + PWD_LENGTH, records[count].nonce, key_out) != 0)
+        if (crypto_secretbox_open_easy(p_Record->pwd, ciphertext, crypto_secretbox_MACBYTES + PWD_LENGTH, p_Record->nonce, key_out) != 0)
         {
             fclose(file);
             return;
         }
         printf("\n");
-        count++;
+        i++;
     }
 
-    if (count == 0)
+    if (i == 0)
     {
         printf("You have stored no password yet.\n");
     }
@@ -448,17 +448,17 @@ void see_pwd(unsigned char *key_out)
 
     printf(" name / username-email / password\n");
     printf("==================================\n");
-    for (int i = 0; i < count; i++)
+    for (int j = 0; j < i; j++)
     {
-        printf("%s {%s, %s (%s)}\n", records[i].name, records[i].username, records[i].pwd, pwd_level(records[i].pwd));
+        printf("%s {%s, %s (%s)}\n", p_Record->name, p_Record->username, p_Record->pwd, pwd_level(p_Record->pwd));
     }
-    printf("\nYou have %d password stored. you have enough space for %d more.\n", count, MAX_RECORD - count);
+    printf("\nYou have %d password stored. you have enough space for %d more.\n", i, MAX_RECORD - i);
 }
 
 void search_pwd(unsigned char *key_out, unsigned char *name)
 {
     Record records[MAX_RECORD];
-
+    Record *p_Record = records;
     char name_buf[NAME_SIZE];
     unsigned char *search_name;
 
@@ -570,7 +570,7 @@ void change_pwd(unsigned char *key_out)
     name_search[strcspn(name_search, "\n")] = '\0';
 
     Record records[MAX_RECORD];
-    Record *p_Record = &records;
+    Record *p_Record = records;
     bool found = false;
 
     FILE *file = fopen("database.bin", "r+b");
@@ -591,7 +591,6 @@ void change_pwd(unsigned char *key_out)
             found = true;
             break;
         }
-        p_Record++;
     }
 
     if (!found)
@@ -714,12 +713,13 @@ void change_pwd(unsigned char *key_out)
 void delete_pwd(unsigned char *key_out)
 {
     Record records[MAX_RECORD];
+    Record *p_Record = records;
+
+    int index;
     unsigned char to_delete[NAME_SIZE];
     printf("What is the name of the app/program you want to delete?\n");
     fgets(to_delete, NAME_SIZE, stdin);
     to_delete[strcspn(to_delete, "\n")] = '\0';
-
-    int index = -1;
 
     FILE *file = fopen("database.bin", "rb");
 
@@ -753,8 +753,11 @@ void delete_pwd(unsigned char *key_out)
         {
             printf("Did you mean one of these? [complete name/N]\n");
             return;
+        } else {
+            return;
         }
     }
+    
     char answer[3];
     printf("Are you sure you want to delete %s? [Y/N]\n", records[index].name);
     fgets(answer, sizeof(answer), stdin);
