@@ -176,7 +176,8 @@ char *pwd_level(unsigned char *pwd)
 }
 
 char *pwd_generator()
-{
+{   
+    srand(time(NULL));
     char *possibleChar = "2z9+ib|meLVw6>W/&C?!@r$d<8SPxTGOkl,hK%%-4NF.0nca)5DqZJQ3U(XMAvgtj*s=I7B^1_pYfyHoE;";
     int length = 15 + rand() % 5;
     char *pwd = malloc(length + 1);
