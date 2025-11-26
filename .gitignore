@@ -3,6 +3,7 @@ database.bin
 .vscode/
 main
 test.c
+/build
 
 # Prerequisites
 *.d

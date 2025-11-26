@@ -1,6 +1,6 @@
-#include "main.h"
-#include "defs.h"
-#include "helperFunction.h"
+#include "../include/main.h"
+#include "../include/defs.h"
+#include "../include/helperFunction.h"
 
 /* Function's code */
 int main(int argc, char *argv[])
