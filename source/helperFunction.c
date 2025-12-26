@@ -116,6 +116,7 @@ int print_names(unsigned char *name)
     }
 
     fclose(file);
+    file = NULL;
 
     if (index == 0)
     {
