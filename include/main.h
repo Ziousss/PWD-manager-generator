@@ -20,12 +20,11 @@ void search_pwd(unsigned char *key_out, unsigned char *name);
 void change_pwd(unsigned char *key_out);
 void delete_pwd(unsigned char *key_out);
 
-typedef struct
-{
+typedef struct{
     char name[NAME_SIZE];
     char username[NAME_SIZE];
-    unsigned char pwd[crypto_secretbox_MACBYTES + PWD_LENGTH];
     unsigned char nonce[crypto_secretbox_NONCEBYTES];
+    unsigned char pwd[crypto_secretbox_MACBYTES + PWD_LENGTH];
 } Record;
 
 #endif

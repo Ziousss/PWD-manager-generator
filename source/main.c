@@ -397,7 +397,7 @@ void first_time(unsigned char *key_out)
 void see_pwd(unsigned char *key_out)
 {
     Record records[MAX_RECORD];
-    Record *p_Record = records;
+
     FILE *file = fopen("database.bin", "rb");
     if (file == NULL)
     {
@@ -411,35 +411,29 @@ void see_pwd(unsigned char *key_out)
     int i = 0;
     while (i < MAX_RECORD)
     {
-        if (fread(p_Record->name, 1, NAME_SIZE, file) != NAME_SIZE)
-        {
+        if (fread(records[i].name, 1, NAME_SIZE, file) != NAME_SIZE)
             break;
-        }
-        p_Record->name[NAME_SIZE - 1] = '\0';
+        records[i].name[NAME_SIZE - 1] = '\0';
 
-        if (fread(p_Record->username, 1, NAME_SIZE, file) != NAME_SIZE)
-        {
+        if (fread(records[i].username, 1, NAME_SIZE, file) != NAME_SIZE)
             break;
-        }
-        p_Record->username[NAME_SIZE - 1] = '\0';
+        records[i].username[NAME_SIZE - 1] = '\0';
 
-        if (fread(p_Record->nonce, 1, NONCE_SIZE, file) != NONCE_SIZE)
-        {
+        if (fread(records[i].nonce, 1, NONCE_SIZE, file) != NONCE_SIZE)
             break;
-        }
 
         unsigned char ciphertext[crypto_secretbox_MACBYTES + PWD_LENGTH];
-        if (fread(ciphertext, 1, crypto_secretbox_MACBYTES + PWD_LENGTH, file) != crypto_secretbox_MACBYTES + PWD_LENGTH)
-        {
+        if (fread(ciphertext, 1, sizeof(ciphertext), file) != sizeof(ciphertext))
             break;
-        }
-        if (crypto_secretbox_open_easy(p_Record->pwd, ciphertext, crypto_secretbox_MACBYTES + PWD_LENGTH, p_Record->nonce, key_out) != 0)
+
+        if (crypto_secretbox_open_easy(records[i].pwd, ciphertext,
+                                       sizeof(ciphertext),
+                                       records[i].nonce, key_out) != 0)
         {
             fclose(file);
-            file = NULL;
             return;
         }
-        printf("\n");
+
         i++;
     }
 
@@ -447,16 +441,23 @@ void see_pwd(unsigned char *key_out)
     {
         printf("You have stored no password yet.\n");
     }
+
     fclose(file);
-    file = NULL;
 
     printf(" name / username-email / password\n");
     printf("==================================\n");
+
     for (int j = 0; j < i; j++)
     {
-        printf("%s {%s, %s (%s)}\n", p_Record->name, p_Record->username, p_Record->pwd, pwd_level(p_Record->pwd));
+        printf("%s {%s, %s (%s)}\n",
+               records[j].name,
+               records[j].username,
+               records[j].pwd,
+               pwd_level(records[j].pwd));
     }
-    printf("\nYou have %d password stored. you have enough space for %d more.\n", i, MAX_RECORD - i);
+
+    printf("\nYou have %d password stored. you have enough space for %d more.\n",
+           i, MAX_RECORD - i);
 }
 
 void search_pwd(unsigned char *key_out, unsigned char *name)
